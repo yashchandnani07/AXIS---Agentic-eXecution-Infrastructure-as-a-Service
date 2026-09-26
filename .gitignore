@@ -1,0 +1,16 @@
+# @file .gitignore  @phase P1  @purpose Keep secrets, build output and local state out of git.
+node_modules/
+dist/
+.next/
+out/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+**/.env.local
+!**/.env.local.example
+apps/orchestrator/.data/
+sentinel-report.json
+apps/control-center/public/replay/
+infra/ibm-cloud/replay-site/site/

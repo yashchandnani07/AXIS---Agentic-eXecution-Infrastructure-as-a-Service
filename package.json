@@ -1,0 +1,29 @@
+{
+  "name": "bobops",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @bobops/orchestrator --filter @bobops/control-center run dev",
+    "dev:api": "pnpm --filter @bobops/orchestrator run dev",
+    "dev:ui": "pnpm --filter @bobops/control-center run dev",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "vitest run --passWithNoTests",
+    "build:mcp": "pnpm --filter @bobops/bob-mcp run build",
+    "smoke:ibm": "pnpm --filter @bobops/scripts run smoke:ibm",
+    "smoke:aws": "pnpm --filter @bobops/scripts run smoke:aws",
+    "api:e2e": "pnpm --filter @bobops/scripts run api:e2e",
+    "sentinel": "pnpm --filter @bobops/scripts run sentinel",
+    "demo:reset": "pnpm --filter @bobops/scripts run demo:reset",
+    "demo:golden": "pnpm --filter @bobops/scripts run demo:golden",
+    "demo:fault": "pnpm --filter @bobops/scripts run demo:fault",
+    "demo:replay": "pnpm --filter @bobops/scripts run demo:replay"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

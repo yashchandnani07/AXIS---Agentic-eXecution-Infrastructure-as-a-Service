@@ -1,0 +1,8 @@
+# @file pnpm-workspace.yaml
+# @phase P1
+# @purpose Declares every workspace package. apps/* = runnable apps, packages/* = libraries, scripts = tooling package.
+# @agentNotes Do not add new globs; new packages must live under apps/ or packages/.
+packages:
+  - apps/*
+  - packages/*
+  - scripts

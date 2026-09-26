@@ -1,0 +1,12 @@
+# @file .bobignore  @phase P1
+# @purpose Paths IBM Bob must never read: secrets, local state, generated/bulky files (saves Bobcoins too).
+.env
+.env.*
+!.env.example
+**/.env.local
+apps/orchestrator/.data/
+**/node_modules/
+**/dist/
+**/.next/
+**/out/
+pnpm-lock.yaml
