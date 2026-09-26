@@ -1,0 +1,19 @@
+{
+  "name": "@bobops/orchestrator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bobops/core": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "dotenv": "^16.4.7",
+    "execa": "^9.5.2",
+    "hono": "^4.7.0",
+    "zod": "^3.25.0"
+  }
+}
