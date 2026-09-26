@@ -670,6 +670,95 @@ console.log('Health probe:', await probeHealth({ provider: 'aws', endpoint: resu
   and `Health probe: { ok: true, statusCode: 200, revision: 'smoke-1' }`.
 - [ ] **Step 5 (HUMAN):** `pnpm demo:reset`
 
+### Task 7.6 — RETROFIT (post-phase-9): this ONE class now serves both real AWS architectures
+
+> Depends on Task 2.13 (core). `AwsLambdaProvider` already only ever published a plain version. It now branches on
+> `target.service`/`ref.service` between `lambda` (on-demand) and `lambda-provisioned` (provisioned concurrency,
+> eliminates cold starts) — no new class, no new credentials, same SDK client already imported.
+
+- [ ] **Step 1: In `infra/aws/deployer-policy.json`**, add three actions to the `ManageBobOpsLambdas` statement's
+  `Action` array: `"lambda:PutProvisionedConcurrencyConfig"`, `"lambda:GetProvisionedConcurrencyConfig"`,
+  `"lambda:DeleteProvisionedConcurrencyConfig"`. **If you already ran the `aws iam put-user-policy` command in Task 7.1,
+  re-run it now** to push the updated policy to the real `bobops-deployer` user — the schema change alone does not update AWS.
+
+- [ ] **Step 2: In `src/provider.ts`**, add three imports from `@aws-sdk/client-lambda`:
+  `DeleteProvisionedConcurrencyConfigCommand`, `GetProvisionedConcurrencyConfigCommand`,
+  `PutProvisionedConcurrencyConfigCommand`; and import `type ServiceId` from `@bobops/core`. Add, right after
+  `export const LAMBDA_ALIAS = 'live';`:
+
+```ts
+/** Kept at 1 for the demo: it is the smallest amount that eliminates cold starts, at minimum cost. */
+const PROVISIONED_CONCURRENCY = 1;
+```
+
+  and add `const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));` alongside the existing
+  `errorName`/`isNotFound`/`isConflict` helpers.
+
+- [ ] **Step 2: Add two private methods** to `AwsLambdaProvider`, right after `planResources()`:
+
+```ts
+  /** Applies (or, for on-demand, does nothing) provisioned concurrency to a specific published version and waits until
+   * it is ready to serve traffic, so the alias is never pointed at a version whose warm capacity isn't up yet. */
+  private async applyProvisionedConcurrencyIfNeeded(name: string, version: string, service: ServiceId, progress: ProgressFn): Promise<void> {
+    if (service !== 'lambda-provisioned') return;
+    progress({ type: 'provider.progress', message: `Configuring provisioned concurrency (${PROVISIONED_CONCURRENCY}) on ${name}:${version} to eliminate cold starts` });
+    await this.lambda.send(
+      new PutProvisionedConcurrencyConfigCommand({ FunctionName: name, Qualifier: version, ProvisionedConcurrentExecutions: PROVISIONED_CONCURRENCY }),
+    );
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const status = await this.lambda.send(new GetProvisionedConcurrencyConfigCommand({ FunctionName: name, Qualifier: version }));
+      if (status.Status === 'READY') return;
+      if (status.Status === 'FAILED') throw new Error(`Provisioned concurrency failed on ${name}:${version}: ${status.StatusReason ?? 'unknown reason'}`);
+      await sleep(5000);
+    }
+    throw new Error(`Provisioned concurrency on ${name}:${version} did not become READY in time`);
+  }
+
+  /** Removes provisioned concurrency from a version this deployment is moving away from, so it stops being billed. */
+  private async removeProvisionedConcurrency(name: string, version: string | undefined): Promise<void> {
+    if (!version) return;
+    try {
+      await this.lambda.send(new DeleteProvisionedConcurrencyConfigCommand({ FunctionName: name, Qualifier: version }));
+    } catch (err) {
+      if (!isNotFound(err)) throw err;
+    }
+  }
+```
+
+- [ ] **Step 3:** In `capabilities()`, add `offeredServices: ['lambda', 'lambda-provisioned'] as ServiceId[],` to `base`.
+
+- [ ] **Step 4:** In `planResources()`, append (after the `cloudwatch-log-group` entry):
+
+```ts
+      ...(target.service === 'lambda-provisioned'
+        ? [{ type: `lambda-provisioned-concurrency (${PROVISIONED_CONCURRENCY})`, name: `${target.appName}:<n>`, action: 'create' as const }]
+        : []),
+```
+
+- [ ] **Step 5:** In `deploy()`, right after `const version = await this.publishAndPoint(...)`, add
+  `await this.applyProvisionedConcurrencyIfNeeded(name, version, target.service, progress);`. Mention `target.service`
+  in the `provision.completed` progress message and add `service: target.service,` to the returned evidence object.
+
+- [ ] **Step 6:** In `setEnv()`, capture the alias's CURRENT version before updating config —
+  `const previousAlias = await this.lambda.send(new GetAliasCommand({ FunctionName: name, Name: LAMBDA_ALIAS })).catch(() => undefined);`
+  — then, after `publishAndPoint` returns the new `version`, add:
+  ```ts
+  // Provisioned concurrency is per-version: move it to the new version and stop paying for it on the old one.
+  await this.applyProvisionedConcurrencyIfNeeded(name, version, ref.service, progress);
+  await this.removeProvisionedConcurrency(name, previousAlias?.FunctionVersion);
+  ```
+
+- [ ] **Step 7:** In `rollback()`, right after computing `target` (the version to roll back to) and BEFORE
+  `await this.pointAlias(name, target);`, add:
+  ```ts
+  // Provisioned concurrency is per-version: bring the rolled-back-to version up before the alias moves to it, then
+  // stop paying for warm capacity on the version being rolled back away from.
+  await this.applyProvisionedConcurrencyIfNeeded(name, target, ref.service, progress);
+  ```
+  and right after `await this.pointAlias(name, target);`, add `await this.removeProvisionedConcurrency(name, alias.FunctionVersion);`.
+
+- [ ] **Step 8:** `pnpm test` → still 2/2 version-picker tests pass unchanged.
+
 ## HANDOFF
 
 ```text

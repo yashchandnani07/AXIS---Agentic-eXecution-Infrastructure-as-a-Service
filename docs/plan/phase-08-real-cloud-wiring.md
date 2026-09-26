@@ -401,6 +401,34 @@ main().catch((err) => {
   timeline, including a `guard.blocked` row.
 - [ ] **Step 6:** Stop the orchestrator (Ctrl+C), then run `pnpm demo:reset`.
 
+### Task 8.4 — RETROFIT (post-phase-9): smoke test the other architecture on each cloud
+
+> Depends on Task 2.13 (core), 6.6 (IBM), 7.6 (AWS). `scripts/smoke/deploy-ibm.ts` and `scripts/smoke/deploy-aws.ts` now
+> read `--scale-to-zero` / `--provisioned` flags so a human can prove BOTH real architectures work against real clouds,
+> not just the defaults `examplePlan()` happens to use.
+
+- [ ] **Step 1: In `scripts/smoke/deploy-ibm.ts`**, import `type ServiceId` from `@bobops/core`; add
+  `const service: ServiceId = process.argv.includes('--scale-to-zero') ? 'code-engine-scale-to-zero' : 'code-engine';`
+  near the top; use `service` (not the literal `'code-engine'`) in the deploy `target`; add
+  `architectureRationale: 'Smoke test target, chosen via --scale-to-zero flag or default (always-on).'`; and pass
+  `service` to the final `provider.logs({ provider: 'ibm-cloud', service, appName: ..., region }, 10)` call (it now
+  requires `service`).
+
+- [ ] **Step 2: In `scripts/smoke/deploy-aws.ts`**, the same pattern with
+  `const service: ServiceId = process.argv.includes('--provisioned') ? 'lambda-provisioned' : 'lambda';` and
+  `architectureRationale: 'Smoke test target, chosen via --provisioned flag or default (on-demand).'`.
+
+- [ ] **Step 3 (HUMAN, optional but recommended before the real demo):**
+  ```powershell
+  pnpm demo:golden
+  pnpm --filter @bobops/scripts run smoke:ibm -- --scale-to-zero
+  pnpm --filter @bobops/scripts run smoke:aws -- --provisioned
+  pnpm demo:reset
+  ```
+  Expected: both deploy successfully; the AWS one additionally logs
+  `Configuring provisioned concurrency (1) on bobops-nimbus-books:N ...` and the health probe still returns 200 once
+  provisioned concurrency reports `READY` (can take up to ~1–2 min).
+
 ## HANDOFF
 
 ```text

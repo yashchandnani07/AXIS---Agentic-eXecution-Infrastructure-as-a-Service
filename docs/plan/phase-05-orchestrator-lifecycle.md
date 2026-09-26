@@ -1352,6 +1352,62 @@ describe('orchestrator lifecycle (fake clouds)', () => {
 - [ ] **Step 2:** `pnpm install; pnpm test` → Expected: all pass (core 23, demo 6, orchestrator 7 + 6 = 42).
 - [ ] **Step 3:** `pnpm typecheck` → Expected: no errors.
 
+### Task 5.7 — RETROFIT (post-phase-9): carry `service` through deployments, arm the sentinel with the user's interval
+
+> Depends on Task 2.13 (core). `DeploymentRef`/`Deployment` now carry `service` so a later `status/logs/setEnv/rollback`
+> call always knows which of the two real architectures is live; `armSentinel` reads the run's chosen check-in cadence.
+
+- [ ] **Step 1: In `src/services/lifecycle-service.ts`**, update `refFor`:
+
+```ts
+  private refFor(dep: Deployment): DeploymentRef {
+    return { provider: dep.provider, service: dep.service, appName: dep.appName, region: dep.region, endpoint: dep.endpoint, revision: dep.revision };
+  }
+```
+
+- [ ] **Step 2:** In `deployTarget()`, add `service: target.service,` to the `Deployment` object literal (right after
+  `provider: target.provider,`).
+
+- [ ] **Step 3:** Replace `armSentinel`:
+
+```ts
+  private async armSentinel(runId: string): Promise<void> {
+    if (!this.d.github) return;
+    const run = this.d.store.getRun(runId);
+    const targets = this.latestDeployments(runId).map((d) => ({
+      runId,
+      provider: d.provider,
+      appName: d.appName,
+      endpoint: d.endpoint ?? '',
+      healthPath: d.healthPath,
+      intervalMinutes: run.sentinelIntervalMinutes,
+    }));
+    try {
+      await this.d.github.publishSentinelTargets(targets);
+      this.emit(
+        runId,
+        'orchestrator',
+        'action',
+        'sentinel.armed',
+        `GitHub health sentinel armed for ${targets.length} endpoint(s), checking in every ${run.sentinelIntervalMinutes} min`,
+        [evidence('Sentinel targets (repo variable SENTINEL_TARGETS)', 'GitHub Actions', targets)],
+      );
+    } catch (err) {
+      this.emit(runId, 'orchestrator', 'observation', 'orchestrator.warning', `Could not arm the GitHub sentinel: ${errMsg(err)}`);
+    }
+  }
+```
+
+- [ ] **Step 4:** The two inline `ProviderCapabilities` fallback object literals in this file (in `verifyRun`'s status
+  lookup catch, and in `exportEvidence`'s capabilities catch) each need `offeredServices: [],` added alongside `services: [],`.
+
+- [ ] **Step 5: In `src/testing/fake-provider.ts`**, import `servicesForProvider` from `@bobops/core` and add
+  `offeredServices: servicesForProvider(this.id).map((s) => s.service),` to `capabilities()`'s return object (alongside
+  `services: ['fake'],`).
+
+- [ ] **Step 6:** `pnpm test` → still 6/6 lifecycle tests pass unchanged (FakeProvider's behavior is service-agnostic by
+  design; only its capabilities() shape changed).
+
 ## HANDOFF
 
 ```text

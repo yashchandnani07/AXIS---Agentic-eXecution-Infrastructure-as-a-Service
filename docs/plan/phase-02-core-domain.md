@@ -1452,6 +1452,290 @@ export * from './fixtures';
 - [ ] **Step 1:** `pnpm test` → Expected: **all core tests pass** (state-machine 4, util 3, probe 3, sentinel 3, schemas 7, metrics 3 = 23 tests).
 - [ ] **Step 2:** `pnpm typecheck` → Expected: no errors.
 
+### Task 2.13 — RETROFIT (post-phase-9): real per-cloud architecture choice + user-defined sentinel interval
+
+> **If you are running this phase fresh, apply this task too — it supersedes the original TargetPlanSchema/DeploymentSchema/
+> provider-contract.ts/fixtures.ts/sentinel.ts shown above.** It was added after the original build because a single fixed
+> service per cloud gave the cloud-architect specialist nothing real to decide. Full rationale: see the retrofit commit
+> `feat: real per-cloud architecture choice + user-defined sentinel interval`.
+
+- [ ] **Step 1: In `packages/core/src/schemas.ts`**, right after `export type ProviderId = ...`, add:
+
+```ts
+/**
+ * Every deployable service, across both clouds. Each cloud offers two real architectures on the same cost/latency axis:
+ * an always-warm option (no cold starts, higher idle cost) and a cost-optimized option (scales down when idle, possible
+ * cold start). This is a genuine trade-off the cloud-architect specialist evaluates per app, not a cosmetic label —
+ * see SERVICE_CATALOG below and .bob/rules-multicloud-devops/04-specialists-and-synthesis.md.
+ */
+export const ServiceIdSchema = z.enum(['code-engine', 'code-engine-scale-to-zero', 'lambda', 'lambda-provisioned']);
+export type ServiceId = z.infer<typeof ServiceIdSchema>;
+
+export interface ServiceDescriptor {
+  service: ServiceId;
+  provider: ProviderId;
+  label: string;
+  /** 'warm' = always ready, no cold starts, higher idle cost. 'cost-optimized' = scales down when idle, cheaper, possible cold start. */
+  kind: 'warm' | 'cost-optimized';
+  description: string;
+}
+
+/** The real, deployable architecture choices per cloud. Both variants of a cloud share the SAME provider adapter class —
+ * the adapter branches on `target.service` — so adding a variant here never requires a new class or new credentials. */
+export const SERVICE_CATALOG: readonly ServiceDescriptor[] = [
+  {
+    service: 'code-engine',
+    provider: 'ibm-cloud',
+    label: 'Code Engine — always-on container',
+    kind: 'warm',
+    description: 'min-scale 1: at least one instance always running. Predictable latency, no cold starts, higher idle cost.',
+  },
+  {
+    service: 'code-engine-scale-to-zero',
+    provider: 'ibm-cloud',
+    label: 'Code Engine — scale-to-zero container',
+    kind: 'cost-optimized',
+    description: 'min-scale 0: scales to zero when idle. Lower cost for infrequent traffic; a cold start on the first request after idling.',
+  },
+  {
+    service: 'lambda',
+    provider: 'aws',
+    label: 'Lambda — on-demand',
+    kind: 'cost-optimized',
+    description: 'Pay per invocation only. Lower cost for infrequent or bursty traffic; possible cold starts.',
+  },
+  {
+    service: 'lambda-provisioned',
+    provider: 'aws',
+    label: 'Lambda — provisioned concurrency',
+    kind: 'warm',
+    description: 'Keeps warm instances ready. Eliminates cold starts, at the cost of paying for idle warm capacity.',
+  },
+] as const;
+
+export function servicesForProvider(provider: ProviderId): ServiceDescriptor[] {
+  return SERVICE_CATALOG.filter((s) => s.provider === provider);
+}
+
+export function describeService(service: ServiceId): ServiceDescriptor {
+  const found = SERVICE_CATALOG.find((s) => s.service === service);
+  if (!found) throw new Error(`Unknown service "${service}"`);
+  return found;
+}
+```
+
+- [ ] **Step 2: Replace `TargetPlanSchema` and `DeploymentPlanSchema`** with:
+
+```ts
+export const TargetPlanSchema = z
+  .object({
+    provider: ProviderIdSchema,
+    service: ServiceIdSchema,
+    region: z.string().min(1),
+    appName: z.string().regex(APP_NAME_PATTERN, 'appName must match ^bobops-[a-z0-9-]{3,40}$'),
+    port: z.number().int().positive().default(8080),
+    resources: z.array(ResourceSchema).default([]),
+    /** NON-secret configuration only. Secret keys are rejected; use secretRefs. */
+    env: z.record(z.string()).default({}),
+    /** Names of secrets resolved by the orchestrator from SECRET_<NAME> and stored in the provider's secret mechanism. */
+    secretRefs: z.array(z.string()).default([]),
+    healthPath: z.string().startsWith('/').default('/health'),
+    /** Why THIS service was chosen for THIS cloud over the other real option in SERVICE_CATALOG. Must cite the app
+     * profile (traffic pattern, latency sensitivity, cost). This is a real decision, not a label — see rule 04. */
+    architectureRationale: z
+      .string()
+      .min(20, 'Explain why this service was chosen over the alternative for this cloud, citing the app profile'),
+  })
+  .refine((t) => SERVICE_CATALOG.some((s) => s.provider === t.provider && s.service === t.service), {
+    message: 'service must be one of the real options offered for this provider — see servicesForProvider()',
+  })
+  .refine((t) => Object.keys(t.env).every((k) => !isSecretKey(k)), {
+    message: 'Secret-looking keys (TOKEN/SECRET/PASSWORD/API_KEY/PRIVATE) must be listed in secretRefs, not env',
+  });
+export type TargetPlan = z.infer<typeof TargetPlanSchema>;
+
+export const DeploymentPlanSchema = z
+  .object({
+    summary: z.string().min(1),
+    targets: z.array(TargetPlanSchema).min(1),
+    risks: z.array(RiskSchema).default([]),
+    generatedAssets: z.array(z.object({ path: z.string(), purpose: z.string() })).default([]),
+    rollbackStrategy: z.string().min(1),
+    approvalGates: z.array(z.string()).min(1),
+    estimatedMonthlyCostUsd: z.number().nonnegative().optional(),
+  })
+  .refine((p) => new Set(p.targets.map((t) => t.provider)).size === p.targets.length, {
+    message: 'A plan may have at most one target per provider (one architecture choice per cloud)',
+  });
+export type DeploymentPlan = z.infer<typeof DeploymentPlanSchema>;
+```
+
+- [ ] **Step 3: In `DeploymentSchema`**, add one field right after `provider: ProviderIdSchema,`:
+
+```ts
+  /** which of the two real architectures on this cloud is live — the adapter branches on this for status/logs/setEnv/rollback */
+  service: ServiceIdSchema,
+```
+
+- [ ] **Step 4: In `RunSchema`**, add one field right after `targets: z.array(ProviderIdSchema).min(1),`:
+
+```ts
+  /** How often the user wants this deployment checked by the GitHub sentinel, in minutes (must be a multiple of 5 —
+   * GitHub Actions cannot schedule faster than that). Set at run creation; see sentinel.ts's shouldProbeNow(). */
+  sentinelIntervalMinutes: z.number().int().min(5).max(1440).default(5),
+```
+
+- [ ] **Step 5: In `packages/core/src/provider-contract.ts`**, import `ServiceId` alongside the other schema types, then:
+  - Add `service: ServiceId;` to `DeploymentRef` (documented: "which of the two real architectures on this cloud is live").
+  - Add `offeredServices: ServiceId[];` to `ProviderCapabilities` (documented: "the real, deployable architecture choices on this cloud").
+
+- [ ] **Step 6: In `packages/core/src/fixtures.ts`**, replace `IBM_TARGET`/`AWS_TARGET`/`examplePlan()` so each target carries a real `architectureRationale`, add `IBM_TARGET_SCALE_TO_ZERO` and `AWS_TARGET_PROVISIONED` alternates, and let `examplePlan(targets, variants)` pick between them:
+
+```ts
+const IBM_TARGET: TargetPlan = {
+  provider: 'ibm-cloud',
+  service: 'code-engine',
+  region: 'us-south',
+  appName: 'bobops-nimbus-books',
+  port: 8080,
+  healthPath: '/health',
+  env: { CATALOG_MODE: 'featured', APP_VERSION: '1.0.0', DEPLOY_PROVIDER: 'ibm-cloud' },
+  secretRefs: ['ADMIN_TOKEN'],
+  architectureRationale:
+    'IBM Cloud is the primary demo target and backs the live judged run: it must respond immediately with no cold-start ' +
+    'delay, so the always-on container (min-scale 1) is chosen over the scale-to-zero variant despite its higher idle cost.',
+  resources: [
+    { type: 'code-engine-project', name: 'bobops-demo', action: 'reuse' },
+    { type: 'code-engine-build-run', name: 'bobops-nimbus-books-build', action: 'create' },
+    { type: 'code-engine-secret', name: 'bobops-nimbus-books-secrets', action: 'create' },
+    { type: 'code-engine-app', name: 'bobops-nimbus-books', action: 'create' },
+  ],
+};
+
+const IBM_TARGET_SCALE_TO_ZERO: TargetPlan = {
+  ...IBM_TARGET,
+  service: 'code-engine-scale-to-zero',
+  architectureRationale:
+    'This target sees low, infrequent traffic outside the demo window, so scale-to-zero (min-scale 0) is chosen to avoid ' +
+    'paying for an idle instance; an occasional cold start on the first request is an acceptable trade-off here.',
+};
+
+const AWS_TARGET: TargetPlan = {
+  provider: 'aws',
+  service: 'lambda',
+  region: 'us-east-1',
+  appName: 'bobops-nimbus-books',
+  port: 8080,
+  healthPath: '/health',
+  env: { CATALOG_MODE: 'featured', APP_VERSION: '1.0.0', DEPLOY_PROVIDER: 'aws' },
+  secretRefs: ['ADMIN_TOKEN'],
+  architectureRationale:
+    'AWS is the secondary target with lower expected call volume than IBM Cloud, so on-demand Lambda (pay per invocation) ' +
+    'is chosen over provisioned concurrency: the cost saving outweighs the risk of an occasional cold start here.',
+  resources: [
+    { type: 'lambda-function', name: 'bobops-nimbus-books', action: 'create' },
+    { type: 'lambda-alias', name: 'live', action: 'create' },
+    { type: 'lambda-function-url', name: 'bobops-nimbus-books:live', action: 'create' },
+  ],
+};
+
+const AWS_TARGET_PROVISIONED: TargetPlan = {
+  ...AWS_TARGET,
+  service: 'lambda-provisioned',
+  architectureRationale:
+    'This target is latency-sensitive (health checks or user traffic must never see a cold start), so provisioned ' +
+    'concurrency is chosen despite the extra cost of keeping a warm instance ready at all times.',
+};
+
+const TEMPLATES: Record<ProviderId, Record<ServiceId, TargetPlan>> = {
+  'ibm-cloud': { 'code-engine': IBM_TARGET, 'code-engine-scale-to-zero': IBM_TARGET_SCALE_TO_ZERO } as Record<ServiceId, TargetPlan>,
+  aws: { lambda: AWS_TARGET, 'lambda-provisioned': AWS_TARGET_PROVISIONED } as Record<ServiceId, TargetPlan>,
+};
+
+const DEFAULT_SERVICE: Record<ProviderId, ServiceId> = { 'ibm-cloud': 'code-engine', aws: 'lambda' };
+
+/**
+ * Builds a valid example plan. `variants` lets a caller pick the OTHER real architecture for a cloud
+ * (e.g. `{ 'ibm-cloud': 'code-engine-scale-to-zero' }`) — used by tests and rule 04's worked example to show that both
+ * options are real, schema-valid choices, not just the default.
+ */
+export function examplePlan(
+  targets: ProviderId[] = ['ibm-cloud', 'aws'],
+  variants: Partial<Record<ProviderId, ServiceId>> = {},
+): DeploymentPlan {
+  const chosen = targets.map((provider) => TEMPLATES[provider][variants[provider] ?? DEFAULT_SERVICE[provider]]);
+  return {
+    summary: `Deploy nimbus-books to ${chosen.map((t) => `${t.provider} (${t.service})`).join(' + ')} with verified health`,
+    targets: chosen,
+    risks: [
+      { id: 'R1', title: 'Missing CATALOG_MODE makes the service unhealthy', severity: 'medium', mitigation: 'Set explicitly per target; sentinel detects drift' },
+      { id: 'R2', title: 'Lambda env holds ADMIN_TOKEN (KMS-encrypted at rest)', severity: 'low', mitigation: 'V2: move to AWS Secrets Manager' },
+    ],
+    generatedAssets: [
+      { path: 'apps/demo-service/Dockerfile', purpose: 'Code Engine build from source' },
+      { path: 'apps/demo-service/.dockerignore', purpose: 'Keep the image small' },
+      { path: 'apps/demo-service/.ceignore', purpose: 'Keep node_modules out of the Code Engine source upload' },
+      { path: 'apps/demo-service/src/lambda.ts', purpose: 'AWS Lambda Function URL entry point' },
+    ],
+    rollbackStrategy:
+      'IBM Cloud: restore configuration or roll back to the previous revision image. AWS: move the live alias to the previous published version.',
+    approvalGates: ['This deployment plan', 'Every remediation or rollback'],
+    estimatedMonthlyCostUsd: 5,
+  };
+}
+```
+
+- [ ] **Step 7: In `packages/core/src/sentinel.ts`**, replace `SentinelTargetSchema` and add `shouldProbeNow`:
+
+```ts
+/** GitHub Actions cannot run a schedule faster than every 5 minutes, so the workflow cron is fixed at that floor.
+ * A user-chosen check-in cadence slower than 5 min is honored by shouldProbeNow() sampling every Nth tick — see below. */
+export const SENTINEL_CRON_MINUTES = 5;
+
+export const SentinelTargetSchema = z.object({
+  runId: z.string(),
+  provider: ProviderIdSchema,
+  appName: z.string(),
+  endpoint: z.string().url(),
+  healthPath: z.string().default('/health'),
+  /** How often the user wants this deployment checked, in minutes. Must be a multiple of SENTINEL_CRON_MINUTES;
+   * the cron itself still fires every 5 min, but shouldProbeNow() skips ticks until this many minutes have passed. */
+  intervalMinutes: z
+    .number()
+    .int()
+    .min(SENTINEL_CRON_MINUTES)
+    .max(1440)
+    .default(SENTINEL_CRON_MINUTES)
+    .refine((n) => n % SENTINEL_CRON_MINUTES === 0, `intervalMinutes must be a multiple of ${SENTINEL_CRON_MINUTES}`),
+});
+export type SentinelTarget = z.infer<typeof SentinelTargetSchema>;
+
+/**
+ * Stateless sampling: the workflow's cron always fires every SENTINEL_CRON_MINUTES, but a target with a slower
+ * user-chosen interval is only actually probed on the ticks that land on a multiple of its interval. No external
+ * state needed — every runner agrees on the same wall-clock tick.
+ */
+export function shouldProbeNow(target: Pick<SentinelTarget, 'intervalMinutes'>, now: Date = new Date()): boolean {
+  const tick = Math.floor(now.getTime() / 60_000 / SENTINEL_CRON_MINUTES) * SENTINEL_CRON_MINUTES;
+  return tick % target.intervalMinutes === 0;
+}
+```
+
+- [ ] **Step 7b:** In the same file, add `skipped?: boolean;` to `SentinelResult` (documented: "true when this tick was
+  skipped because the target's user-chosen intervalMinutes hasn't elapsed yet"), and in `renderStepSummary`, replace the
+  `verdict` line with:
+  ```ts
+    const verdict = r.skipped
+      ? `⏭️ not due (every ${r.target.intervalMinutes}m)`
+      : r.incident
+        ? '🚨 INCIDENT'
+        : r.probes.every((p) => p.ok)
+          ? '✅ healthy'
+          : '⚠️ flaky';
+  ```
+- [ ] **Step 8:** Add the retrofit tests: in `schemas.test.ts`, tests for `servicesForProvider`, accepting the scale-to-zero variant as valid, rejecting a short `architectureRationale`, and rejecting two targets for the same provider; in `sentinel.test.ts`, tests for the `intervalMinutes` multiple-of-5 refine and for `shouldProbeNow` sampling (see the real files for the exact assertions — both are short and self-explanatory).
+- [ ] **Step 9:** `pnpm test` → Expected: 27 core tests pass (was 23).
+
 ## HANDOFF
 
 ```text

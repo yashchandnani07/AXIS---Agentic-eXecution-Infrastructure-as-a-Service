@@ -628,6 +628,39 @@ console.log('Logs (last 10):', await provider.logs({ provider: 'ibm-cloud', appN
 - [ ] **Step 5 (HUMAN):** Open the endpoint plus `/api/books` in a browser. Expected: 3 featured books.
 - [ ] **Step 6 (HUMAN):** `pnpm demo:reset`. The app **keeps running** on IBM Cloud; the demo will update it in place.
 
+### Task 6.6 — RETROFIT (post-phase-9): this ONE class now serves both real IBM architectures
+
+> Depends on Task 2.13 (core). `IbmCloudProvider` already only ever built `--min-scale 1`. It now branches on
+> `target.service`/`ref.service` between `code-engine` (min-scale 1, always-on) and `code-engine-scale-to-zero`
+> (min-scale 0) — no new class, no new credentials.
+
+- [ ] **Step 1: In `src/provider.ts`**, import `type ServiceId` from `@bobops/core` alongside the existing imports, and
+  add, right after `const SESSION_TTL_MS = 20 * 60_000;`:
+
+```ts
+/** The one place the two IBM architectures differ in the actual `ibmcloud ce app` call: min-scale. */
+function minScaleFor(service: ServiceId): string {
+  return service === 'code-engine-scale-to-zero' ? '0' : '1';
+}
+```
+
+- [ ] **Step 2:** In `capabilities()`, add `offeredServices: ['code-engine', 'code-engine-scale-to-zero'] as ServiceId[],`
+  to the `base` object (alongside `services: [...]`).
+
+- [ ] **Step 3:** In `planResources()`, change the last resource's `type` from `'code-engine-app'` to
+  `` `code-engine-app (min-scale ${minScaleFor(target.service)})` ``.
+
+- [ ] **Step 4:** In `deploy()`, replace the hardcoded `'--min-scale', '1',` with `'--min-scale', minScale,` where
+  `const minScale = minScaleFor(target.service);` is declared right before the `progress({ type: 'build.started', ... })`
+  call, and mention `${target.service}, min-scale ${minScale}` in that progress message.
+
+- [ ] **Step 5:** In `setEnv()`, add `'--min-scale', minScaleFor(ref.service),` to the `ce app update` args (idempotent
+  re-assertion — guards against scaling-mode drift from a manual `ibmcloud` command).
+
+- [ ] **Step 6:** In `rollback()`, add `'--min-scale', minScaleFor(ref.service),` to the final `ce app update` args too.
+
+- [ ] **Step 7:** `pnpm test` → still 4/4 parser tests pass unchanged (the retrofit doesn't touch parsing).
+
 ## HANDOFF
 
 ```text

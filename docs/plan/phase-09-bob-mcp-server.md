@@ -610,6 +610,62 @@ await client.close();
 
   Expected: Bob calls the tool without asking (it is in alwaysAllow) and reports IBM Cloud plus AWS as authenticated.
 
+### Task 9.5 — RETROFIT (post-phase-9): let Bob ask the user for architecture rationale + check-in cadence
+
+> Depends on Task 2.13 (core). `devops_create_run`'s tool description now tells Bob to ask the developer how often the
+> sentinel should check in, and `summarizeRun` now surfaces each target's `service`/`architectureRationale` so Bob (and
+> the judge reading a session transcript) can see the real decision, not just the outcome.
+
+- [ ] **Step 1: In `src/tools.ts`**, replace the `devops_create_run` definition's description and input shape:
+
+```ts
+  define(
+    'devops_create_run',
+    'ACTION (UNDERSTAND). Start a deployment run for a repository folder (path relative to the workspace root, e.g. apps/demo-service) and objective. Ask the developer how often they want the GitHub sentinel to check on this deployment after it goes live (5, 15, 30 or 60 minutes are good choices — it must be a multiple of 5) and pass it as sentinelIntervalMinutes; default to 5 if they have no preference. Returns runId and the Control Center URL to share with the developer.',
+    {
+      projectName: z.string().describe('short project name, e.g. nimbus-books'),
+      repoPath: z.string().describe('folder relative to the workspace root'),
+      objective: z.string().describe("the developer's deployment goal in one sentence"),
+      targets: z.array(ProviderIdSchema).min(1),
+      sentinelIntervalMinutes: z
+        .number()
+        .int()
+        .min(5)
+        .max(1440)
+        .default(5)
+        .describe('How often (in minutes, multiple of 5) the GitHub sentinel checks this deployment after it is live. Ask the developer; default 5.'),
+    },
+    async (args) => {
+      const run = await api.post<{ id: string }>('/api/runs', args);
+      return { runId: run.id, state: 'created', controlCenterUrl: `${uiBase}/run?id=${run.id}`, next: 'Run the specialist subagents, then devops_record_analysis.' };
+    },
+  );
+```
+
+- [ ] **Step 2: In `src/summarize.ts`**, change the `targets` and `deployments` mappings in `summarizeRun`:
+
+```ts
+    targets: (agg.run.plan?.targets ?? []).map((t) => ({
+      provider: t.provider,
+      service: t.service,
+      architectureRationale: t.architectureRationale,
+      appName: t.appName,
+      region: t.region,
+      env: t.env,
+    })),
+    deployments: [...latestDeploy.values()].map((d) => ({
+      provider: d.provider,
+      service: d.service,
+      status: d.status,
+      endpoint: d.endpoint,
+      revision: d.revision,
+      error: d.error,
+      note: d.note,
+    })),
+```
+
+- [ ] **Step 3:** `pnpm test; pnpm build:mcp` → still green; the bundle grows negligibly.
+
 ## HANDOFF
 
 ```text

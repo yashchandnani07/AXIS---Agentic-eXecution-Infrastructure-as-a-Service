@@ -119,12 +119,20 @@ export interface SentinelResult {
   probes: HealthCheck[];
   incident: boolean;
   issueUrl?: string;
+  /** true when this tick was skipped because the target's user-chosen intervalMinutes hasn't elapsed yet (shouldProbeNow) */
+  skipped?: boolean;
 }
 
 export function renderStepSummary(results: SentinelResult[]): string {
   const rows = results.map((r) => {
     const last = r.probes[r.probes.length - 1];
-    const verdict = r.incident ? '🚨 INCIDENT' : r.probes.every((p) => p.ok) ? '✅ healthy' : '⚠️ flaky';
+    const verdict = r.skipped
+      ? `⏭️ not due (every ${r.target.intervalMinutes}m)`
+      : r.incident
+        ? '🚨 INCIDENT'
+        : r.probes.every((p) => p.ok)
+          ? '✅ healthy'
+          : '⚠️ flaky';
     return `| ${r.target.provider} | ${r.target.appName} | ${verdict} | ${r.probes.filter((p) => p.ok).length}/${r.probes.length} | ${last ? `${last.statusCode} / ${last.latencyMs} ms` : '—'} | ${r.issueUrl ?? ''} |`;
   });
   return [

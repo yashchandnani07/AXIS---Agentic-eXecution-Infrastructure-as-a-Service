@@ -170,7 +170,17 @@ Every subagent must return ONLY this JSON (it is `SpecialistFinding` from `packa
 > Inspect `<REPO>` read-only. Propose how to run it on IBM Cloud Code Engine (container built from source with a Dockerfile)
 > and on AWS Lambda behind a Function URL. State: whether it is stateless, container port, whether a Lambda handler entry
 > exists (`src/lambda.ts` exporting `handler`) or must be generated, required resources per cloud, and the scaling and cost
-> posture. Return only the JSON object with specialist "cloud-architect".
+> posture.
+>
+> For EACH requested cloud, you must pick ONE of its two real, deployable architectures — call `devops_list_providers`
+> first if you have not already, or read `packages/core/src/schemas.ts`'s `SERVICE_CATALOG` — and state which one you
+> recommend, in your `findings`, as a sentence in this shape: `"<cloud>: recommend <service> because <app-profile fact>"`.
+> The two options per cloud are always the same trade-off: an always-warm option (no cold starts, higher idle cost) vs a
+> cost-optimized option (scales down when idle, cheaper, possible cold start). Base your pick on evidence from the repo
+> and the deployment objective — traffic pattern, whether the objective mentions "demo"/"judged"/"latency-sensitive"
+> (favor warm), or "low-traffic"/"cost"/"infrequent" (favor cost-optimized). If the objective gives no signal either way,
+> default to the cost-optimized option and say so — never pick the warm option "by default" without a stated reason,
+> since it costs more. Return only the JSON object with specialist "cloud-architect".
 
 **security-reviewer**
 > Inspect `<REPO>` read-only (never open .env files). Identify secrets and how they are consumed, auth-protected routes,
@@ -207,23 +217,31 @@ Create a todo list with these items first: UNDERSTAND, PLAN, APPROVAL, TEST+PROV
 
 1. **OBSERVE providers:** `devops_list_providers`. If a requested target is `authenticated:false`, stop and tell the
    developer which provider is not connected (quote the note). Do not continue for that target.
-2. **Create the run:** `devops_create_run` with `projectName`, `repoPath`, `objective`, `targets`. Share the
-   `controlCenterUrl` with the developer.
+2. **Create the run:** ask the developer, in one short question, how often they want the GitHub sentinel to check on this
+   deployment once it is live (mention that 5, 15, 30 or 60 minutes are common choices, and it must be a multiple of 5).
+   If they don't answer or say "don't know" / "default", use 5. Then call `devops_create_run` with `projectName`,
+   `repoPath`, `objective`, `targets`, and `sentinelIntervalMinutes`. Share the `controlCenterUrl` with the developer and
+   tell them this is where they will review and approve the plan.
 3. **UNDERSTAND:** run the 4 parallel specialists (rule 04), synthesize, then call `devops_record_analysis`.
 4. **Deployment assets:** check whether `<repoPath>/Dockerfile`, `.dockerignore`, `.ceignore` and `src/lambda.ts` exist.
    If any is missing, use the skill **deployment-asset-authoring** to create them, then show the developer the file list.
    Run `pnpm --filter <package name from package.json> build` to prove the app still builds (ACTION plus VERIFICATION).
 5. **PLAN:** build ONE `DeploymentPlan` (shape reference only: `examplePlan()` in `packages/core/src/fixtures.ts`; derive
-   the values from this run's analysis):
-   - one target per requested provider: `ibm-cloud` → service `code-engine`, region `us-south`; `aws` → service `lambda`,
-     region `us-east-1`
+   the values from this run's analysis — NEVER copy the fixture's values without evidence, see rule 01):
+   - one target per requested provider, using the SERVICE the cloud-architect specialist recommended in rule 04 (one of
+     `code-engine` / `code-engine-scale-to-zero` for `ibm-cloud`, region `us-south`; one of `lambda` / `lambda-provisioned`
+     for `aws`, region `us-east-1`)
+   - `architectureRationale`: the cloud-architect's stated reason, rewritten as a full sentence citing the app profile —
+     this field is REQUIRED and validated (≥ 20 characters); a generic sentence like "because it's cheaper" will be
+     rejected by rule 01's evidence standard even if the schema accepts it — cite the actual traffic/latency reasoning
    - `appName`: `bobops-<project-name>` (for example `bobops-nimbus-books`)
    - `env`: every required non-secret variable with its correct value (for Nimbus Books: `CATALOG_MODE=featured`,
      `APP_VERSION=1.0.0`, `DEPLOY_PROVIDER=<provider>`)
    - `secretRefs`: secret names only (for example `ADMIN_TOKEN`)
    - `resources`, `risks` (from the specialists), `generatedAssets` (the files from step 4), `rollbackStrategy`,
      `approvalGates`, `estimatedMonthlyCostUsd`
-   Call `devops_submit_plan`. If it returns validation issues, fix exactly those fields and resubmit.
+   Call `devops_submit_plan`. If it returns validation issues, fix exactly those fields and resubmit. Tell the developer,
+   in your summary, which architecture you chose per cloud AND why — this is the plan's headline decision, not a footnote.
 6. **APPROVAL:** follow rule 02. Say: "Please review and approve in the Control Center: <approveAt>". Then call
    `devops_wait` with `until=plan_decided`, `timeoutSec=900`.
 7. **EXECUTE:** `devops_execute_plan`. Tell the developer that tests run first, and that the Code Engine build takes 2–5 minutes
@@ -398,13 +416,19 @@ Begin now with `devops_sync_incidents` and the todo list.
 - [ ] **Step 2:** Run `pnpm demo:reset`, then `pnpm dev:api` in terminal 1. Leave the UI for later.
 - [ ] **Step 3:** In a NEW Bob task, select the DevOps mode and type `/deploy apps/demo-service`.
 - [ ] **Step 4:** Watch for, and screenshot:
+  - Bob asking how often you want the sentinel to check in (reply e.g. "15 minutes")
   - the todo list with lifecycle items
   - `devops_list_providers` → both authenticated
   - **4 subagents spawned in parallel** (aggregate subagent panel)
+  - the cloud-architect's finding naming ONE of the two real services per cloud with a stated reason
   - asset generation (Dockerfile, .dockerignore, .ceignore, src/lambda.ts), then a build verification
-  - `devops_submit_plan` returning `awaiting_approval` with an approveAt URL
+  - `devops_submit_plan` returning `awaiting_approval` with an approveAt URL, and Bob's summary stating which
+    architecture it chose per cloud and why
 - [ ] **Step 5:** Stop the Bob task (**do not approve**). Check the API:
-  `curl.exe -s http://localhost:4000/api/runs` → the newest run shows `"state":"awaiting_approval"`.
+  `curl.exe -s http://localhost:4000/api/runs` → the newest run shows `"state":"awaiting_approval"` and
+  `"sentinelIntervalMinutes":15` (or whatever you answered).
+  `curl.exe -s http://localhost:4000/api/runs/<id>` → `run.plan.targets[].architectureRationale` is a real sentence
+  (not "because", not copied verbatim from `EXAMPLE_APP_PROFILE`/`examplePlan()`).
 - [ ] **Step 6:** Tune only if needed. If Bob skipped something, tighten the wording of the relevant rule (not the code).
   Afterwards: stop the API, run `pnpm demo:reset`, and `git checkout -- apps/demo-service` if Bob edited any tracked file.
 

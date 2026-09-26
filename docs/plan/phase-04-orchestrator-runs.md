@@ -975,6 +975,45 @@ describe('orchestrator: runs, plans and approvals', () => {
 - [ ] **Step 3:** In a browser, open `http://localhost:4000/api/events/stream`, then create another run. Expected: a
   `run-event` line appears live. Afterwards, stop the server and delete `apps/orchestrator/.data/store.json`.
 
+### Task 4.8 — RETROFIT (post-phase-9): user-defined sentinel check-in interval
+
+> Depends on Task 2.13 (core). `Run` now carries `sentinelIntervalMinutes` so the developer (via Bob) controls how often
+> the GitHub sentinel checks a deployment, instead of a hardcoded 5-minute cadence.
+
+- [ ] **Step 1: In `src/services/run-service.ts`**, add a field to `CreateRunInput`:
+
+```ts
+export interface CreateRunInput {
+  projectName: string;
+  repoPath: string;
+  objective: string;
+  targets: ProviderId[];
+  /** How often the user wants the GitHub sentinel to check on this deployment, in minutes (multiple of 5). */
+  sentinelIntervalMinutes?: number;
+}
+```
+
+  Then in `createRun()`, add `sentinelIntervalMinutes: input.sentinelIntervalMinutes ?? 5,` to the `Run` object literal
+  (right after `targets: [...new Set(input.targets)],`), and update the `run.created` message to end with
+  `` ` (sentinel check-in every ${run.sentinelIntervalMinutes} min)` ``.
+
+- [ ] **Step 2: In `src/routes/runs.ts`**, add to `CreateRunBody`:
+
+```ts
+  /** How often the user wants the GitHub sentinel to check on this deployment, in minutes. GitHub Actions cannot
+   * schedule faster than every 5 minutes, so this must be a multiple of 5 (5, 10, 15, 30, 60, ...). */
+  sentinelIntervalMinutes: z
+    .number()
+    .int()
+    .min(5)
+    .max(1440)
+    .refine((n) => n % 5 === 0, 'sentinelIntervalMinutes must be a multiple of 5')
+    .default(5)
+    .optional(),
+```
+
+- [ ] **Step 3:** `pnpm test` → still 36 orchestrator-related tests pass unchanged (this field has a default, so no existing test call site breaks).
+
 ## HANDOFF
 
 ```text

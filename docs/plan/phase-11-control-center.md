@@ -868,12 +868,14 @@ export function AnalysisPanel({ agg }: { agg: RunAggregate }) {
  * @file      apps/control-center/components/plan-panel.tsx
  * @phase     P11
  * @owner     Product & Experience
- * @purpose   PLAN view: per-cloud target design (resources, env, secret refs), risks, generated assets, rollback, gates, cost.
+ * @purpose   PLAN view: per-cloud ARCHITECTURE CHOICE (with the rationale Bob gave for it vs. the other real option),
+ *            resources, env, secret refs, risks, generated assets, rollback, gates, cost.
  * @depends   @bobops/core, ./ui
  * @usedBy    app/run/page.tsx
- * @agentNotes Secret refs render as 🔒 names only — values never reach the UI.
+ * @agentNotes Secret refs render as 🔒 names only — values never reach the UI. The kind badge + rationale are the
+ *             centerpiece of this panel: they are the proof that Bob made a real decision, not a fixed mapping.
  */
-import type { RunAggregate } from '@bobops/core';
+import { describeService, servicesForProvider, type RunAggregate } from '@bobops/core';
 import { Panel, ProviderBadge, SeverityDot } from './ui';
 
 export function PlanPanel({ agg }: { agg: RunAggregate }) {
@@ -886,40 +888,59 @@ export function PlanPanel({ agg }: { agg: RunAggregate }) {
       right={<span className="font-mono text-[10px] text-muted">sha256 {agg.run.planHash?.slice(0, 12)}…</span>}
     >
       <div className="grid gap-4 md:grid-cols-2">
-        {plan.targets.map((t) => (
-          <div key={t.provider} className="rounded-md border border-line bg-canvas p-4">
-            <div className="flex items-center justify-between">
-              <ProviderBadge provider={t.provider} />
-              <span className="font-mono text-xs text-muted">
-                {t.service} · {t.region}
-              </span>
-            </div>
-            <p className="mt-2 font-mono text-sm">{t.appName}</p>
-            <table className="mt-3 w-full text-xs">
-              <tbody>
-                {t.resources.map((r) => (
-                  <tr key={r.type + r.name} className="border-t border-line">
-                    <td className="py-1 pr-2 text-muted">{r.action}</td>
-                    <td className="py-1 pr-2">{r.type}</td>
-                    <td className="py-1 font-mono">{r.name}</td>
-                  </tr>
+        {plan.targets.map((t) => {
+          const chosen = describeService(t.service);
+          const alternative = servicesForProvider(t.provider).find((s) => s.service !== t.service);
+          return (
+            <div key={t.provider} className="rounded-md border border-line bg-canvas p-4">
+              <div className="flex items-center justify-between">
+                <ProviderBadge provider={t.provider} />
+                <span className="font-mono text-xs text-muted">{t.region}</span>
+              </div>
+              <p className="mt-2 font-mono text-sm">{t.appName}</p>
+              <div className="mt-3 flex items-center gap-2">
+                <span
+                  className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${chosen.kind === 'warm' ? 'bg-ok/15 text-ok' : 'bg-info/15 text-info'}`}
+                >
+                  {chosen.kind === 'warm' ? '● always warm' : '◐ cost-optimized'}
+                </span>
+                <span className="text-xs font-semibold">{chosen.label}</span>
+              </div>
+              <p className="mt-2 rounded bg-bob/10 p-2 text-xs">
+                <span className="font-semibold text-bob">Why this architecture: </span>
+                {t.architectureRationale}
+              </p>
+              {alternative && (
+                <p className="mt-1 text-[10px] text-muted">
+                  Not chosen: <span className="font-mono">{alternative.label}</span> — {alternative.description}
+                </p>
+              )}
+              <table className="mt-3 w-full text-xs">
+                <tbody>
+                  {t.resources.map((r) => (
+                    <tr key={r.type + r.name} className="border-t border-line">
+                      <td className="py-1 pr-2 text-muted">{r.action}</td>
+                      <td className="py-1 pr-2">{r.type}</td>
+                      <td className="py-1 font-mono">{r.name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="mt-3 flex flex-wrap gap-1">
+                {Object.entries(t.env).map(([k, v]) => (
+                  <span key={k} className="rounded bg-layer-2 px-2 py-0.5 font-mono text-[10px]">
+                    {k}={v}
+                  </span>
                 ))}
-              </tbody>
-            </table>
-            <div className="mt-3 flex flex-wrap gap-1">
-              {Object.entries(t.env).map(([k, v]) => (
-                <span key={k} className="rounded bg-layer-2 px-2 py-0.5 font-mono text-[10px]">
-                  {k}={v}
-                </span>
-              ))}
-              {t.secretRefs.map((s) => (
-                <span key={s} className="rounded bg-bob/15 px-2 py-0.5 font-mono text-[10px] text-bob">
-                  🔒 {s}
-                </span>
-              ))}
+                {t.secretRefs.map((s) => (
+                  <span key={s} className="rounded bg-bob/15 px-2 py-0.5 font-mono text-[10px] text-bob">
+                    🔒 {s}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="mt-5 grid gap-6 text-sm md:grid-cols-3">
         <div>
@@ -1419,6 +1440,8 @@ function RunView() {
           </h1>
           <p className="mt-1 text-sm text-muted">
             {data.run.objective} · <span className="font-mono">{data.run.repoPath}</span> · {data.run.targets.join(' + ')}
+            {' · sentinel check-in every '}
+            <span className="font-mono">{data.run.sentinelIntervalMinutes}</span> min
           </p>
         </div>
         <div className="text-right">
@@ -1456,7 +1479,10 @@ function RunView() {
 - [ ] **Step 3 (fast AWS-only loop, about 2 min):** in another terminal run
   `pnpm api:e2e --targets aws --with-recovery --ui-approval`. Open the printed Control Center link and add `&demo=1`.
   Expected, live without refreshing:
-  - the stepper advances UNDERSTAND → PLAN, and the **approval card** appears with the hash. Click **Approve**.
+  - the header shows `sentinel check-in every 5 min` (the `api:e2e` script doesn't set a custom interval)
+  - the stepper advances UNDERSTAND → PLAN, and the plan panel shows a kind badge (● always warm or ◐ cost-optimized)
+    plus a "Why this architecture" rationale sentence and the alternative that was NOT chosen, for each cloud
+  - the **approval card** appears with the hash. Click **Approve**.
   - TEST → PROVISION → BUILD → DEPLOY → VERIFY turn green. The AWS card shows the endpoint, HTTP 200 and the latency.
   - An incident appears (red), then the diagnosis card (purple) and a **remediation approval card**. Click **Approve**.
   - The incident turns **resolved** and shows its MTTR. The metrics strip fills in. The audit trail shows a red
