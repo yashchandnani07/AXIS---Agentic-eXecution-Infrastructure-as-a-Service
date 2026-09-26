@@ -1,0 +1,5 @@
+# @file apps/demo-service/.ceignore (golden)  @purpose files NOT uploaded by `ibmcloud ce app create --build-source`
+node_modules
+dist
+*.test.ts
+.env*

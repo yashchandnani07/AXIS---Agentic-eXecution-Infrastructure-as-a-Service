@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "demo:golden": "tsx demo/golden.ts",
+    "demo:reset": "tsx demo/reset.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7"
