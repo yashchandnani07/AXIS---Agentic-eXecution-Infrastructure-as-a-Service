@@ -107,7 +107,7 @@ flowchart LR
     MODE["🛰️ Multi-Cloud DevOps mode<br/>6 rules · 2 skills · /deploy · /investigate"]
     SUB["4 parallel specialist subagents<br/>(explore preset)"]
   end
-  MCP["apps/bob-mcp<br/>MCP stdio server · 16 tools<br/>(NO approve tool)"]
+  MCP["apps/bob-mcp<br/>MCP stdio server · 17 tools<br/>(NO approve tool)"]
   ORCH["apps/orchestrator<br/>Hono API · state machine<br/>approval guard · evidence store · SSE"]
   UI["apps/control-center<br/>Next.js · approvals · audit trail · metrics"]
   IBM["IBM Cloud Code Engine<br/>build from source · secrets · logs"]
@@ -319,7 +319,7 @@ IBM-Bob/                                   # repo root (GitHub repo: bobops)
 │   │       └── app.test.ts  lifecycle.test.ts
 │   ├── bob-mcp/                 (P9)      # MCP stdio server that exposes the orchestrator to Bob
 │   │   ├── package.json  tsconfig.json  build.mjs
-│   │   └── src/index.ts  client.ts  tools.ts  summarize.ts  summarize.test.ts
+│   │   └── src/index.ts  client.ts  tools.ts  summarize.ts  summarize.test.ts  selftest.ts
 │   └── control-center/          (P11)     # Next.js 15 product UI
 │       ├── package.json  next.config.ts  .env.local(.example)
 │       ├── app/layout.tsx  app/globals.css  app/page.tsx  app/run/page.tsx
@@ -416,10 +416,10 @@ Error body is always `{ "error": string, "code": string }`. Status codes: 400 va
 
 ### 8.3 MCP tools exposed to Bob (`apps/bob-mcp`)
 
-`devops_list_providers` · `devops_create_run` · `devops_get_run` · `devops_record_analysis` · `devops_log_note` ·
+`devops_list_providers` · `devops_list_runs` · `devops_create_run` · `devops_get_run` · `devops_record_analysis` · `devops_log_note` ·
 `devops_submit_plan` · `devops_wait` · `devops_execute_plan` · `devops_verify` · `devops_get_logs` ·
 `devops_sync_incidents` · `devops_get_incident` · `devops_record_diagnosis` · `devops_propose_remediation` ·
-`devops_execute_remediation` · `devops_export_evidence` (16 tools). **There is intentionally no approve tool.**
+`devops_execute_remediation` · `devops_export_evidence` (17 tools). **There is intentionally no approve tool.**
 
 ### 8.4 Environment variables (`.env` at repo root; template in `.env.example`)
 

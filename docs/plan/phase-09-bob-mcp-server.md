@@ -1,11 +1,11 @@
 <!--
 @file     docs/plan/phase-09-bob-mcp-server.md
-@purpose  Build the MCP bridge that lets IBM Bob drive the orchestrator (16 tools, deliberately NO approve tool).
+@purpose  Build the MCP bridge that lets IBM Bob drive the orchestrator (17 tools, deliberately NO approve tool).
 @owner    Orchestration & Cloud (O)
 -->
 # Phase 09 — `apps/bob-mcp`: the MCP bridge between IBM Bob and the orchestrator (~60 min)
 
-**Goal:** Build a stdio MCP server that Bob launches from `.bob/mcp.json`. It exposes 16 lifecycle tools that call the
+**Goal:** Build a stdio MCP server that Bob launches from `.bob/mcp.json`. It exposes 17 lifecycle tools that call the
 orchestrator's HTTP API. It returns **compact** summaries, which saves Bobcoins and context, and it forwards validation errors
 verbatim so Bob can fix its own JSON. There is **no approve tool**, and a self-test proves that.
 
@@ -270,7 +270,7 @@ export function summarizeRun(agg: RunAggregate, uiBase: string) {
  * @file      apps/bob-mcp/src/tools.ts
  * @phase     P9
  * @owner     Orchestration & Cloud
- * @purpose   Registers the 16 BobOps lifecycle tools on the MCP server. Tool descriptions are prompts for Bob:
+ * @purpose   Registers the 17 BobOps lifecycle tools on the MCP server. Tool descriptions are prompts for Bob:
  *            they state the lifecycle stage, evidence kind and the NEXT expected tool call.
  * @depends   @modelcontextprotocol/sdk, zod, @bobops/core (schemas = JSON Schema Bob sees), ./client, ./summarize
  * @usedBy    ./index.ts
@@ -333,6 +333,24 @@ export function registerTools(server: McpServer, api: OrchestratorClient, uiBase
     'OBSERVATION. List the cloud providers the orchestrator can deploy to (IBM Cloud Code Engine, AWS Lambda) and whether each is authenticated. Call this FIRST.',
     {},
     () => api.get('/api/providers'),
+  );
+
+  define(
+    'devops_list_runs',
+    'OBSERVATION. List the 10 most recent runs (newest first) with state and the number of open incidents. Use it to find the runId for /investigate.',
+    {},
+    async () => {
+      const runs = await api.get<Array<{ id: string; projectName: string; state: string; targets: string[]; createdAt: string }>>('/api/runs');
+      const incidents = await api.get<Array<{ runId: string; status: string }>>('/api/incidents');
+      return runs.slice(0, 10).map((r) => ({
+        runId: r.id,
+        projectName: r.projectName,
+        state: r.state,
+        targets: r.targets,
+        createdAt: r.createdAt,
+        openIncidents: incidents.filter((i) => i.runId === r.id && i.status !== 'resolved').length,
+      }));
+    },
   );
 
   define(
@@ -564,6 +582,7 @@ await client.close();
       "timeout": 900,
       "alwaysAllow": [
         "devops_list_providers",
+        "devops_list_runs",
         "devops_get_run",
         "devops_get_incident",
         "devops_get_logs",
@@ -582,9 +601,9 @@ await client.close();
 > confirmation, which adds a second human checkpoint.
 
 - [ ] **Step 3 (HUMAN):** Terminal 1: `pnpm dev:api`. Terminal 2: `pnpm --filter @bobops/bob-mcp selftest`.
-  Expected: `16 tools: devops_list_providers, devops_create_run, …` followed by the providers JSON.
+  Expected: `17 tools: devops_list_providers, devops_create_run, …` followed by the providers JSON.
 - [ ] **Step 4 (HUMAN):** In IBM Bob, open **Settings → MCP Servers**, or click the MCP icon in the Bob panel. Expected:
-  `bobops-orchestrator` appears (project scope) with a green status and 16 tools. If it's red, click restart. If it's still
+  `bobops-orchestrator` appears (project scope) with a green status and 17 tools. If it's red, click restart. If it's still
   red, check that the `args` path exists.
 - [ ] **Step 5 (HUMAN):** Start a new Bob task (Ask mode) and send:
   > Use the devops_list_providers tool and tell me which clouds are authenticated.
@@ -596,15 +615,15 @@ await client.close();
 ```text
 ✅ PHASE 09 COMPLETE — Bob ⇄ orchestrator MCP bridge
 BUILT:
-  - apps/bob-mcp: client (x-actor: bob, readable errors), compact run summary (+1 test), 16 tools, stdio server, selftest
+  - apps/bob-mcp: client (x-actor: bob, readable errors), compact run summary (+1 test), 17 tools, stdio server, selftest
   - .bob/mcp.json registering "bobops-orchestrator" (project scope, read-only tools auto-allowed)
 DO THIS (human):
   1. pnpm test; pnpm typecheck; pnpm build:mcp
   2. terminal 1: pnpm dev:api   terminal 2: pnpm --filter @bobops/bob-mcp selftest
-  3. Bob → MCP panel: bobops-orchestrator is green with 16 tools
+  3. Bob → MCP panel: bobops-orchestrator is green with 17 tools
   4. Bob (Ask mode): "Use the devops_list_providers tool and tell me which clouds are authenticated."
 EXPECT:
-  - selftest prints "16 tools: …" and provider JSON; no approve tool exists
+  - selftest prints "17 tools: …" and provider JSON; no approve tool exists
   - Bob answers with IBM Cloud Code Engine + AWS Lambda, authenticated: true
 IF IT FAILS:
   - MCP red in Bob → wrong absolute path in .bob/mcp.json, or bundle not built (pnpm build:mcp)

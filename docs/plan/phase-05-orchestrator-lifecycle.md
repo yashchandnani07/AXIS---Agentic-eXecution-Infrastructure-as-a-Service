@@ -852,7 +852,9 @@ export class LifecycleService {
         ),
       ),
     );
-    fs.writeFileSync(path.join(dir, 'providers.json'), JSON.stringify(capabilities, null, 2));
+    // Public evidence: drop account names/ids and identity notes (the repo is public).
+    const publicCapabilities = capabilities.map((c) => ({ ...c, account: undefined, notes: [] }));
+    fs.writeFileSync(path.join(dir, 'providers.json'), JSON.stringify(publicCapabilities, null, 2));
     const rel = (p: string) => path.relative(this.d.repoRoot, p).split(path.sep).join('/');
     this.emit(runId, 'orchestrator', 'action', 'evidence.exported', `Audit trail exported to ${rel(mdPath)} and ${rel(jsonPath)}`);
     return { json: rel(jsonPath), markdown: rel(mdPath) };

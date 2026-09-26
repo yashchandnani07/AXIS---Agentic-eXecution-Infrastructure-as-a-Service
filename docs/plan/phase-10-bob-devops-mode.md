@@ -186,6 +186,8 @@ Every subagent must return ONLY this JSON (it is `SpecialistFinding` from `packa
 
 **Synthesis (you, the primary agent):**
 1. Merge the four results into ONE `AppProfile` (shape: `EXAMPLE_APP_PROFILE` in `packages/core/src/fixtures.ts`).
+   The fixture is a **shape reference only**. Every value you record must come from this run's specialist evidence, and
+   copying fixture values without evidence violates rule 01.
    Resolve contradictions explicitly: if specialists disagree, re-read the file and state which one was right, as an INFERENCE.
 2. Call `devops_record_analysis`.
 3. Log one `devops_log_note` (kind `inference`) that states the single most important risk.
@@ -211,7 +213,8 @@ Create a todo list with these items first: UNDERSTAND, PLAN, APPROVAL, TEST+PROV
 4. **Deployment assets:** check whether `<repoPath>/Dockerfile`, `.dockerignore`, `.ceignore` and `src/lambda.ts` exist.
    If any is missing, use the skill **deployment-asset-authoring** to create them, then show the developer the file list.
    Run `pnpm --filter <package name from package.json> build` to prove the app still builds (ACTION plus VERIFICATION).
-5. **PLAN:** build ONE `DeploymentPlan` (shape: `examplePlan()` in `packages/core/src/fixtures.ts`):
+5. **PLAN:** build ONE `DeploymentPlan` (shape reference only: `examplePlan()` in `packages/core/src/fixtures.ts`; derive
+   the values from this run's analysis):
    - one target per requested provider: `ibm-cloud` → service `code-engine`, region `us-south`; `aws` → service `lambda`,
      region `us-east-1`
    - `appName`: `bobops-<project-name>` (for example `bobops-nimbus-books`)
@@ -240,8 +243,9 @@ Create a todo list with these items first: UNDERSTAND, PLAN, APPROVAL, TEST+PROV
 
 Create a todo list first: DETECT, EVIDENCE, DIAGNOSE, PROPOSE, APPROVAL, REMEDIATE, RE-VERIFY, CLOSE.
 
-1. **DETECT:** `devops_sync_incidents` (this imports GitHub sentinel issues). Then call `devops_get_run` for the run
-   (ask the developer for the runId if there are several) and pick the open incident.
+1. **DETECT:** `devops_sync_incidents` (this imports GitHub sentinel issues). Then call `devops_list_runs` and take the runId
+   given as the command argument, or else the most recent run with `openIncidents > 0`. Call `devops_get_run` for it and pick
+   the open incident. If no run has an open incident, call `devops_verify` on the latest healthy run and report the result.
 2. **EVIDENCE**, gathered in this order:
    a. `devops_get_incident`: quote the failing probe (statusCode, body such as `checks.config.missing`), the GitHub issue URL,
       and `approvedPlanEnv`.
@@ -382,7 +386,7 @@ argument-hint: [runId]
 <!-- @file .bob/commands/investigate.md  @phase P10  @purpose /investigate entry point for the RECOVER stage. -->
 Act as the 🛰️ Multi-Cloud DevOps Engineer (if you are in another mode, switch to mode `multicloud-devops` first).
 
-Run: the argument of this command if given. Otherwise pick the most recent run that has an open incident.
+Run: the argument of this command if given. Otherwise call `devops_list_runs` and pick the most recent run with open incidents.
 Follow `.bob/rules-multicloud-devops/06-incident-response.md` exactly, using the skill `incident-diagnosis`.
 Begin now with `devops_sync_incidents` and the todo list.
 ```
