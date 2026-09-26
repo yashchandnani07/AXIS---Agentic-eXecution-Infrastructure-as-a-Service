@@ -15,6 +15,7 @@ export default defineConfig({
     alias: {
       '@bobops/core': path.resolve('./packages/core/src/index.ts'),
       '@bobops/provider-ibm-cloud': path.resolve('./packages/provider-ibm-cloud/src/index.ts'),
+      '@bobops/provider-aws': path.resolve('./packages/provider-aws/src/index.ts'),
     },
   },
   test: {

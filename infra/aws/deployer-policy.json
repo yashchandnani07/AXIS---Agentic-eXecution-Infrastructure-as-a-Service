@@ -1,0 +1,47 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageBobOpsLambdas",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:CreateFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:PublishVersion",
+        "lambda:ListVersionsByFunction",
+        "lambda:GetAlias",
+        "lambda:CreateAlias",
+        "lambda:UpdateAlias",
+        "lambda:GetFunctionUrlConfig",
+        "lambda:CreateFunctionUrlConfig",
+        "lambda:AddPermission",
+        "lambda:GetPolicy"
+      ],
+      "Resource": [
+        "arn:aws:lambda:*:*:function:bobops-*",
+        "arn:aws:lambda:*:*:function:bobops-*:*"
+      ]
+    },
+    {
+      "Sid": "PassOnlyTheBobOpsExecutionRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/bobops-lambda-execution"
+    },
+    {
+      "Sid": "ReadBobOpsLogs",
+      "Effect": "Allow",
+      "Action": ["logs:FilterLogEvents", "logs:DescribeLogGroups"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "WhoAmI",
+      "Effect": "Allow",
+      "Action": "sts:GetCallerIdentity",
+      "Resource": "*"
+    }
+  ]
+}

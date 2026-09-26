@@ -6,10 +6,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "demo:golden": "tsx demo/golden.ts",
     "demo:reset": "tsx demo/reset.ts",
-    "smoke:ibm": "tsx smoke/deploy-ibm.ts"
+    "smoke:ibm": "tsx smoke/deploy-ibm.ts",
+    "smoke:aws": "tsx smoke/deploy-aws.ts"
   },
   "dependencies": {
     "@bobops/core": "workspace:*",
+    "@bobops/provider-aws": "workspace:*",
     "@bobops/provider-ibm-cloud": "workspace:*",
     "dotenv": "^16.4.7"
   }

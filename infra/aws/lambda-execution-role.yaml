@@ -1,0 +1,25 @@
+# @file      infra/aws/lambda-execution-role.yaml
+# @phase     P7
+# @owner     Orchestration & Cloud
+# @purpose   CloudFormation: the execution role every BobOps-deployed Lambda function assumes (CloudWatch logging only).
+# @usage     aws cloudformation deploy --template-file infra/aws/lambda-execution-role.yaml --stack-name bobops-iam --capabilities CAPABILITY_NAMED_IAM --region us-east-1
+# @agentNotes HUMAN deploys this with an admin profile. The orchestrator itself cannot create IAM roles (least privilege).
+AWSTemplateFormatVersion: '2010-09-09'
+Description: BobOps - execution role for Lambda functions deployed by the orchestrator
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: bobops-lambda-execution
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+Outputs:
+  RoleArn:
+    Value: !GetAtt LambdaExecutionRole.Arn
