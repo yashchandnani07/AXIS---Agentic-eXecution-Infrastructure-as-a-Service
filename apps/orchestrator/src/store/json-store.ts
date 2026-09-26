@@ -34,9 +34,11 @@ export class JsonStore {
   persist(): void {
     if (!this.file) return;
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
-    const tmp = `${this.file}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
-    fs.renameSync(tmp, this.file);
+    try {
+      fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
+    } catch (err) {
+      console.error('[JsonStore] persist error:', err);
+    }
   }
 
   upsert<K extends keyof StoreData>(collection: K, item: StoreData[K][number]): void {

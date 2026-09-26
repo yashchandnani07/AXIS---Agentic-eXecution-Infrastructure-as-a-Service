@@ -13,7 +13,7 @@
       "code-engine-scale-to-zero"
     ],
     "supportsRollback": true,
-    "authenticated": false,
+    "authenticated": true,
     "notes": []
   },
   {
