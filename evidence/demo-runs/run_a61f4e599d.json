@@ -1,0 +1,1267 @@
+{
+  "run": {
+    "id": "run_a61f4e599d",
+    "projectName": "nimbus-books",
+    "repoPath": "apps/demo-service",
+    "objective": "E2E: deploy to aws",
+    "targets": [
+      "aws"
+    ],
+    "sentinelIntervalMinutes": 5,
+    "state": "healthy",
+    "createdAt": "2026-09-26T20:37:12.037Z",
+    "updatedAt": "2026-09-26T20:37:52.550Z",
+    "stateHistory": [
+      {
+        "state": "created",
+        "at": "2026-09-26T20:37:12.037Z"
+      },
+      {
+        "state": "analyzed",
+        "at": "2026-09-26T20:37:12.071Z"
+      },
+      {
+        "state": "awaiting_approval",
+        "at": "2026-09-26T20:37:12.115Z"
+      },
+      {
+        "state": "approved",
+        "at": "2026-09-26T20:37:12.160Z"
+      },
+      {
+        "state": "deploying",
+        "at": "2026-09-26T20:37:12.190Z"
+      },
+      {
+        "state": "verifying",
+        "at": "2026-09-26T20:37:23.712Z"
+      },
+      {
+        "state": "healthy",
+        "at": "2026-09-26T20:37:27.156Z"
+      },
+      {
+        "state": "verifying",
+        "at": "2026-09-26T20:37:32.124Z"
+      },
+      {
+        "state": "incident",
+        "at": "2026-09-26T20:37:45.095Z"
+      },
+      {
+        "state": "awaiting_remediation_approval",
+        "at": "2026-09-26T20:37:45.155Z"
+      },
+      {
+        "state": "remediating",
+        "at": "2026-09-26T20:37:45.191Z"
+      },
+      {
+        "state": "verifying",
+        "at": "2026-09-26T20:37:49.712Z"
+      },
+      {
+        "state": "healthy",
+        "at": "2026-09-26T20:37:52.550Z"
+      }
+    ],
+    "profile": {
+      "name": "nimbus-books",
+      "runtime": "node",
+      "runtimeVersion": "22",
+      "framework": "hono",
+      "buildCommand": "npm run build",
+      "startCommand": "node dist/server.mjs",
+      "port": 8080,
+      "healthPath": "/health",
+      "requiredEnv": [
+        "CATALOG_MODE"
+      ],
+      "secretEnv": [
+        "ADMIN_TOKEN"
+      ],
+      "dependencies": [
+        "hono",
+        "@hono/node-server"
+      ],
+      "specialistFindings": [
+        {
+          "specialist": "application-analyst",
+          "summary": "Hono 4 HTTP API on Node 22 with a /health endpoint that validates required configuration",
+          "findings": [
+            "src/server.ts listens on PORT (default 8080)",
+            "GET /health returns 503 when CATALOG_MODE is missing"
+          ],
+          "confidence": "high",
+          "evidence": [
+            "apps/demo-service/src/server.ts",
+            "apps/demo-service/src/app.ts"
+          ]
+        },
+        {
+          "specialist": "cloud-architect",
+          "summary": "Container on IBM Cloud Code Engine (primary) and Lambda + Function URL on AWS (secondary)",
+          "findings": [
+            "Stateless service, no database",
+            "Code Engine builds from source with a Dockerfile; Lambda runs a bundled ESM handler"
+          ],
+          "confidence": "high",
+          "evidence": [
+            "apps/demo-service/package.json"
+          ]
+        },
+        {
+          "specialist": "security-reviewer",
+          "summary": "ADMIN_TOKEN is a secret and must not appear in plain configuration",
+          "findings": [
+            "ADMIN_TOKEN guards /api/admin/stats",
+            "IBM: Code Engine secret; AWS: KMS-encrypted Lambda env (V2: Secrets Manager)"
+          ],
+          "confidence": "high",
+          "evidence": [
+            "apps/demo-service/src/app.ts"
+          ]
+        },
+        {
+          "specialist": "release-verifier",
+          "summary": "Vitest suite covers health, catalog and admin routes; /health exposes revision for correlation",
+          "findings": [
+            "Pre-deploy gate: vitest run must pass",
+            "Post-deploy gate: GET /health must return 200 on every target"
+          ],
+          "confidence": "high",
+          "evidence": [
+            "apps/demo-service/src/app.test.ts"
+          ]
+        }
+      ],
+      "risks": [
+        {
+          "id": "R1",
+          "title": "Missing CATALOG_MODE makes the service unhealthy",
+          "severity": "medium",
+          "mitigation": "Plan sets CATALOG_MODE on every target; the sentinel detects drift"
+        }
+      ]
+    },
+    "plan": {
+      "summary": "Deploy nimbus-books to aws (lambda) with verified health",
+      "targets": [
+        {
+          "provider": "aws",
+          "service": "lambda",
+          "region": "us-east-1",
+          "appName": "bobops-nimbus-books",
+          "port": 8080,
+          "resources": [
+            {
+              "type": "lambda-function",
+              "name": "bobops-nimbus-books",
+              "action": "create"
+            },
+            {
+              "type": "lambda-alias",
+              "name": "live",
+              "action": "create"
+            },
+            {
+              "type": "lambda-function-url",
+              "name": "bobops-nimbus-books:live",
+              "action": "create"
+            }
+          ],
+          "env": {
+            "CATALOG_MODE": "featured",
+            "APP_VERSION": "1.0.0",
+            "DEPLOY_PROVIDER": "aws"
+          },
+          "secretRefs": [
+            "ADMIN_TOKEN"
+          ],
+          "healthPath": "/health",
+          "architectureRationale": "AWS is the secondary target with lower expected call volume than IBM Cloud, so on-demand Lambda (pay per invocation) is chosen over provisioned concurrency: the cost saving outweighs the risk of an occasional cold start here."
+        }
+      ],
+      "risks": [
+        {
+          "id": "R1",
+          "title": "Missing CATALOG_MODE makes the service unhealthy",
+          "severity": "medium",
+          "mitigation": "Set explicitly per target; sentinel detects drift"
+        },
+        {
+          "id": "R2",
+          "title": "Lambda env holds ADMIN_TOKEN (KMS-encrypted at rest)",
+          "severity": "low",
+          "mitigation": "V2: move to AWS Secrets Manager"
+        }
+      ],
+      "generatedAssets": [
+        {
+          "path": "apps/demo-service/Dockerfile",
+          "purpose": "Code Engine build from source"
+        },
+        {
+          "path": "apps/demo-service/.dockerignore",
+          "purpose": "Keep the image small"
+        },
+        {
+          "path": "apps/demo-service/.ceignore",
+          "purpose": "Keep node_modules out of the Code Engine source upload"
+        },
+        {
+          "path": "apps/demo-service/src/lambda.ts",
+          "purpose": "AWS Lambda Function URL entry point"
+        }
+      ],
+      "rollbackStrategy": "IBM Cloud: restore configuration or roll back to the previous revision image. AWS: move the live alias to the previous published version.",
+      "approvalGates": [
+        "This deployment plan",
+        "Every remediation or rollback"
+      ],
+      "estimatedMonthlyCostUsd": 5
+    },
+    "planHash": "7391c17c86acd38265757a2c09f0ae9c6fc0011fdea8bd3628da33e89bac2eff"
+  },
+  "approvals": [
+    {
+      "id": "apr_a443718409",
+      "runId": "run_a61f4e599d",
+      "kind": "deploy_plan",
+      "subjectId": "run_a61f4e599d",
+      "subjectHash": "7391c17c86acd38265757a2c09f0ae9c6fc0011fdea8bd3628da33e89bac2eff",
+      "summary": "Deploy nimbus-books to aws (lambda) with verified health",
+      "risk": "medium",
+      "status": "approved",
+      "requestedAt": "2026-09-26T20:37:12.114Z",
+      "decidedAt": "2026-09-26T20:37:12.164Z",
+      "decidedBy": "e2e-script"
+    },
+    {
+      "id": "apr_9d220e2375",
+      "runId": "run_a61f4e599d",
+      "kind": "remediation",
+      "subjectId": "rem_3dd33c4219",
+      "subjectHash": "925ffcc73d509c58cbc3c2dc731cd6358a03dcf21f5a5721bb410e1ec62c3880",
+      "summary": "Set CATALOG_MODE=featured on aws — Restore the approved configuration value",
+      "risk": "low",
+      "status": "approved",
+      "requestedAt": "2026-09-26T20:37:45.146Z",
+      "decidedAt": "2026-09-26T20:37:45.178Z",
+      "decidedBy": "e2e-script"
+    }
+  ],
+  "deployments": [
+    {
+      "id": "dep_3bc5a762fb",
+      "runId": "run_a61f4e599d",
+      "provider": "aws",
+      "service": "lambda",
+      "appName": "bobops-nimbus-books",
+      "region": "us-east-1",
+      "healthPath": "/health",
+      "status": "succeeded",
+      "startedAt": "2026-09-26T20:37:15.443Z",
+      "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+      "revision": "5",
+      "finishedAt": "2026-09-26T20:37:23.704Z"
+    },
+    {
+      "id": "dep_a6e2cb98e0",
+      "runId": "run_a61f4e599d",
+      "provider": "aws",
+      "service": "lambda",
+      "appName": "bobops-nimbus-books",
+      "region": "us-east-1",
+      "healthPath": "/health",
+      "status": "succeeded",
+      "startedAt": "2026-09-26T20:37:32.107Z",
+      "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+      "revision": "6",
+      "finishedAt": "2026-09-26T20:37:32.107Z",
+      "note": "fault injection: removed CATALOG_MODE"
+    },
+    {
+      "id": "dep_5ed7abd896",
+      "runId": "run_a61f4e599d",
+      "provider": "aws",
+      "service": "lambda",
+      "appName": "bobops-nimbus-books",
+      "region": "us-east-1",
+      "healthPath": "/health",
+      "status": "succeeded",
+      "startedAt": "2026-09-26T20:37:49.703Z",
+      "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+      "revision": "7",
+      "finishedAt": "2026-09-26T20:37:49.703Z",
+      "note": "remediation rem_3dd33c4219"
+    }
+  ],
+  "healthChecks": [
+    {
+      "id": "773c7a9d-a191-44f5-979c-5bd1abf721e2",
+      "provider": "aws",
+      "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+      "ok": true,
+      "statusCode": 200,
+      "latencyMs": 2685,
+      "revision": "1.0.0",
+      "body": {
+        "status": "healthy",
+        "service": "nimbus-books",
+        "revision": "1.0.0",
+        "provider": "aws",
+        "startedAt": "2026-09-26T20:37:25.240Z",
+        "checks": {
+          "config": {
+            "ok": true
+          }
+        }
+      },
+      "checkedAt": "2026-09-26T20:37:23.716Z",
+      "runId": "run_a61f4e599d"
+    },
+    {
+      "id": "a91158f8-11c4-4950-ba0f-d7df0d09d606",
+      "provider": "aws",
+      "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+      "ok": false,
+      "statusCode": 503,
+      "latencyMs": 5317,
+      "revision": "1.0.0",
+      "body": {
+        "status": "unhealthy",
+        "service": "nimbus-books",
+        "revision": "1.0.0",
+        "provider": "aws",
+        "startedAt": "2026-09-26T20:37:32.796Z",
+        "checks": {
+          "config": {
+            "ok": false,
+            "missing": [
+              "CATALOG_MODE"
+            ],
+            "hint": "Set the missing environment variables and redeploy"
+          }
+        }
+      },
+      "checkedAt": "2026-09-26T20:37:38.936Z",
+      "runId": "run_a61f4e599d"
+    },
+    {
+      "id": "bc058318-102f-4e8f-ae9b-5ff03e3019f7",
+      "provider": "aws",
+      "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+      "ok": true,
+      "statusCode": 200,
+      "latencyMs": 2112,
+      "revision": "1.0.0",
+      "body": {
+        "status": "healthy",
+        "service": "nimbus-books",
+        "revision": "1.0.0",
+        "provider": "aws",
+        "startedAt": "2026-09-26T20:37:50.645Z",
+        "checks": {
+          "config": {
+            "ok": true
+          }
+        }
+      },
+      "checkedAt": "2026-09-26T20:37:49.715Z",
+      "runId": "run_a61f4e599d"
+    }
+  ],
+  "incidents": [
+    {
+      "id": "inc_7e7ee0234c",
+      "runId": "run_a61f4e599d",
+      "provider": "aws",
+      "source": "orchestrator",
+      "status": "resolved",
+      "title": "aws health checks failing",
+      "openedAt": "2026-09-26T20:37:45.092Z",
+      "probes": [
+        {
+          "id": "a91158f8-11c4-4950-ba0f-d7df0d09d606",
+          "provider": "aws",
+          "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+          "ok": false,
+          "statusCode": 503,
+          "latencyMs": 5317,
+          "revision": "1.0.0",
+          "body": {
+            "status": "unhealthy",
+            "service": "nimbus-books",
+            "revision": "1.0.0",
+            "provider": "aws",
+            "startedAt": "2026-09-26T20:37:32.796Z",
+            "checks": {
+              "config": {
+                "ok": false,
+                "missing": [
+                  "CATALOG_MODE"
+                ],
+                "hint": "Set the missing environment variables and redeploy"
+              }
+            }
+          },
+          "checkedAt": "2026-09-26T20:37:38.936Z",
+          "runId": "run_a61f4e599d"
+        }
+      ],
+      "diagnosis": {
+        "summary": "Configuration drift",
+        "rootCause": "CATALOG_MODE is missing from the running revision",
+        "confidence": "high",
+        "evidence": [
+          "probe body: checks.config.missing=[CATALOG_MODE]",
+          "approved plan env: CATALOG_MODE=featured"
+        ]
+      },
+      "remediation": {
+        "id": "rem_3dd33c4219",
+        "action": {
+          "type": "set_env",
+          "key": "CATALOG_MODE",
+          "value": "featured"
+        },
+        "rationale": "Restore the approved configuration value",
+        "risk": "low",
+        "status": "succeeded",
+        "approvalId": "apr_9d220e2375"
+      },
+      "resolvedAt": "2026-09-26T20:37:52.547Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt_94d7415f69",
+      "at": "2026-09-26T20:37:12.042Z",
+      "runId": "run_a61f4e599d",
+      "actor": "human",
+      "kind": "action",
+      "type": "run.created",
+      "message": "Run created for nimbus-books (apps/demo-service): \"E2E: deploy to aws\" → aws (sentinel check-in every 5 min)",
+      "evidence": []
+    },
+    {
+      "id": "evt_7d9f83238b",
+      "at": "2026-09-26T20:37:12.075Z",
+      "runId": "run_a61f4e599d",
+      "actor": "bob",
+      "kind": "observation",
+      "type": "analysis.recorded",
+      "message": "Bob profiled nimbus-books: node 22 / hono, port 8080, health /health, required env [CATALOG_MODE]",
+      "evidence": [
+        {
+          "label": "Application profile",
+          "source": "bob:synthesis",
+          "capturedAt": "2026-09-26T20:37:12.075Z",
+          "data": {
+            "name": "nimbus-books",
+            "runtime": "node",
+            "runtimeVersion": "22",
+            "framework": "hono",
+            "buildCommand": "npm run build",
+            "startCommand": "node dist/server.mjs",
+            "port": 8080,
+            "healthPath": "/health",
+            "requiredEnv": [
+              "CATALOG_MODE"
+            ],
+            "secretEnv": [
+              "ADMIN_TOKEN"
+            ],
+            "dependencies": [
+              "hono",
+              "@hono/node-server"
+            ],
+            "specialistFindings": [
+              {
+                "specialist": "application-analyst",
+                "summary": "Hono 4 HTTP API on Node 22 with a /health endpoint that validates required configuration",
+                "findings": [
+                  "src/server.ts listens on PORT (default 8080)",
+                  "GET /health returns 503 when CATALOG_MODE is missing"
+                ],
+                "confidence": "high",
+                "evidence": [
+                  "apps/demo-service/src/server.ts",
+                  "apps/demo-service/src/app.ts"
+                ]
+              },
+              {
+                "specialist": "cloud-architect",
+                "summary": "Container on IBM Cloud Code Engine (primary) and Lambda + Function URL on AWS (secondary)",
+                "findings": [
+                  "Stateless service, no database",
+                  "Code Engine builds from source with a Dockerfile; Lambda runs a bundled ESM handler"
+                ],
+                "confidence": "high",
+                "evidence": [
+                  "apps/demo-service/package.json"
+                ]
+              },
+              {
+                "specialist": "security-reviewer",
+                "summary": "ADMIN_TOKEN is a secret and must not appear in plain configuration",
+                "findings": [
+                  "ADMIN_TOKEN guards /api/admin/stats",
+                  "IBM: Code Engine secret; AWS: KMS-encrypted Lambda env (V2: Secrets Manager)"
+                ],
+                "confidence": "high",
+                "evidence": [
+                  "apps/demo-service/src/app.ts"
+                ]
+              },
+              {
+                "specialist": "release-verifier",
+                "summary": "Vitest suite covers health, catalog and admin routes; /health exposes revision for correlation",
+                "findings": [
+                  "Pre-deploy gate: vitest run must pass",
+                  "Post-deploy gate: GET /health must return 200 on every target"
+                ],
+                "confidence": "high",
+                "evidence": [
+                  "apps/demo-service/src/app.test.ts"
+                ]
+              }
+            ],
+            "risks": [
+              {
+                "id": "R1",
+                "title": "Missing CATALOG_MODE makes the service unhealthy",
+                "severity": "medium",
+                "mitigation": "Plan sets CATALOG_MODE on every target; the sentinel detects drift"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_25ffeb6b8f",
+      "at": "2026-09-26T20:37:12.079Z",
+      "runId": "run_a61f4e599d",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "specialist.finding",
+      "message": "application-analyst: Hono 4 HTTP API on Node 22 with a /health endpoint that validates required configuration",
+      "evidence": [
+        {
+          "label": "application-analyst findings",
+          "source": "bob:application-analyst",
+          "capturedAt": "2026-09-26T20:37:12.079Z",
+          "data": {
+            "specialist": "application-analyst",
+            "summary": "Hono 4 HTTP API on Node 22 with a /health endpoint that validates required configuration",
+            "findings": [
+              "src/server.ts listens on PORT (default 8080)",
+              "GET /health returns 503 when CATALOG_MODE is missing"
+            ],
+            "confidence": "high",
+            "evidence": [
+              "apps/demo-service/src/server.ts",
+              "apps/demo-service/src/app.ts"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_929b792941",
+      "at": "2026-09-26T20:37:12.082Z",
+      "runId": "run_a61f4e599d",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "specialist.finding",
+      "message": "cloud-architect: Container on IBM Cloud Code Engine (primary) and Lambda + Function URL on AWS (secondary)",
+      "evidence": [
+        {
+          "label": "cloud-architect findings",
+          "source": "bob:cloud-architect",
+          "capturedAt": "2026-09-26T20:37:12.082Z",
+          "data": {
+            "specialist": "cloud-architect",
+            "summary": "Container on IBM Cloud Code Engine (primary) and Lambda + Function URL on AWS (secondary)",
+            "findings": [
+              "Stateless service, no database",
+              "Code Engine builds from source with a Dockerfile; Lambda runs a bundled ESM handler"
+            ],
+            "confidence": "high",
+            "evidence": [
+              "apps/demo-service/package.json"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_59178ef2f2",
+      "at": "2026-09-26T20:37:12.085Z",
+      "runId": "run_a61f4e599d",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "specialist.finding",
+      "message": "security-reviewer: ADMIN_TOKEN is a secret and must not appear in plain configuration",
+      "evidence": [
+        {
+          "label": "security-reviewer findings",
+          "source": "bob:security-reviewer",
+          "capturedAt": "2026-09-26T20:37:12.085Z",
+          "data": {
+            "specialist": "security-reviewer",
+            "summary": "ADMIN_TOKEN is a secret and must not appear in plain configuration",
+            "findings": [
+              "ADMIN_TOKEN guards /api/admin/stats",
+              "IBM: Code Engine secret; AWS: KMS-encrypted Lambda env (V2: Secrets Manager)"
+            ],
+            "confidence": "high",
+            "evidence": [
+              "apps/demo-service/src/app.ts"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_32b3fd45c7",
+      "at": "2026-09-26T20:37:12.088Z",
+      "runId": "run_a61f4e599d",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "specialist.finding",
+      "message": "release-verifier: Vitest suite covers health, catalog and admin routes; /health exposes revision for correlation",
+      "evidence": [
+        {
+          "label": "release-verifier findings",
+          "source": "bob:release-verifier",
+          "capturedAt": "2026-09-26T20:37:12.088Z",
+          "data": {
+            "specialist": "release-verifier",
+            "summary": "Vitest suite covers health, catalog and admin routes; /health exposes revision for correlation",
+            "findings": [
+              "Pre-deploy gate: vitest run must pass",
+              "Post-deploy gate: GET /health must return 200 on every target"
+            ],
+            "confidence": "high",
+            "evidence": [
+              "apps/demo-service/src/app.test.ts"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_9f31fe6e92",
+      "at": "2026-09-26T20:37:12.122Z",
+      "runId": "run_a61f4e599d",
+      "actor": "bob",
+      "kind": "proposal",
+      "type": "plan.submitted",
+      "message": "Bob proposed a plan for aws/lambda (2 risks, 4 generated assets)",
+      "evidence": [
+        {
+          "label": "Deployment plan",
+          "source": "bob:synthesis",
+          "capturedAt": "2026-09-26T20:37:12.122Z",
+          "data": {
+            "summary": "Deploy nimbus-books to aws (lambda) with verified health",
+            "targets": [
+              {
+                "provider": "aws",
+                "service": "lambda",
+                "region": "us-east-1",
+                "appName": "bobops-nimbus-books",
+                "port": 8080,
+                "resources": [
+                  {
+                    "type": "lambda-function",
+                    "name": "bobops-nimbus-books",
+                    "action": "create"
+                  },
+                  {
+                    "type": "lambda-alias",
+                    "name": "live",
+                    "action": "create"
+                  },
+                  {
+                    "type": "lambda-function-url",
+                    "name": "bobops-nimbus-books:live",
+                    "action": "create"
+                  }
+                ],
+                "env": {
+                  "CATALOG_MODE": "featured",
+                  "APP_VERSION": "1.0.0",
+                  "DEPLOY_PROVIDER": "aws"
+                },
+                "secretRefs": [
+                  "ADMIN_TOKEN"
+                ],
+                "healthPath": "/health",
+                "architectureRationale": "AWS is the secondary target with lower expected call volume than IBM Cloud, so on-demand Lambda (pay per invocation) is chosen over provisioned concurrency: the cost saving outweighs the risk of an occasional cold start here."
+              }
+            ],
+            "risks": [
+              {
+                "id": "R1",
+                "title": "Missing CATALOG_MODE makes the service unhealthy",
+                "severity": "medium",
+                "mitigation": "Set explicitly per target; sentinel detects drift"
+              },
+              {
+                "id": "R2",
+                "title": "Lambda env holds ADMIN_TOKEN (KMS-encrypted at rest)",
+                "severity": "low",
+                "mitigation": "V2: move to AWS Secrets Manager"
+              }
+            ],
+            "generatedAssets": [
+              {
+                "path": "apps/demo-service/Dockerfile",
+                "purpose": "Code Engine build from source"
+              },
+              {
+                "path": "apps/demo-service/.dockerignore",
+                "purpose": "Keep the image small"
+              },
+              {
+                "path": "apps/demo-service/.ceignore",
+                "purpose": "Keep node_modules out of the Code Engine source upload"
+              },
+              {
+                "path": "apps/demo-service/src/lambda.ts",
+                "purpose": "AWS Lambda Function URL entry point"
+              }
+            ],
+            "rollbackStrategy": "IBM Cloud: restore configuration or roll back to the previous revision image. AWS: move the live alias to the previous published version.",
+            "approvalGates": [
+              "This deployment plan",
+              "Every remediation or rollback"
+            ],
+            "estimatedMonthlyCostUsd": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_42f38d24af",
+      "at": "2026-09-26T20:37:12.125Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "proposal",
+      "type": "approval.requested",
+      "message": "Human approval required for the deployment plan (hash 7391c17c86ac…, risk medium)",
+      "evidence": []
+    },
+    {
+      "id": "evt_1d332a46fb",
+      "at": "2026-09-26T20:37:12.135Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "verification",
+      "type": "guard.blocked",
+      "message": "Blocked deployment: no human-approved plan matches the current plan hash (run state: awaiting_approval)",
+      "evidence": []
+    },
+    {
+      "id": "evt_84681f76a7",
+      "at": "2026-09-26T20:37:12.168Z",
+      "runId": "run_a61f4e599d",
+      "actor": "human",
+      "kind": "action",
+      "type": "approval.decided",
+      "message": "e2e-script approved the deployment plan",
+      "evidence": []
+    },
+    {
+      "id": "evt_18ffa02edc",
+      "at": "2026-09-26T20:37:12.194Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "action",
+      "type": "test.started",
+      "message": "Running the pre-deploy test suite in apps/demo-service",
+      "evidence": []
+    },
+    {
+      "id": "evt_2c9620f82a",
+      "at": "2026-09-26T20:37:15.439Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "verification",
+      "type": "test.passed",
+      "message": "Pre-deploy tests passed",
+      "evidence": [
+        {
+          "label": "Test output (tail)",
+          "source": "vitest",
+          "capturedAt": "2026-09-26T20:37:15.439Z",
+          "data": "\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90mC:/Users/Yash/Desktop/work/IBM-Bob/apps/demo-service\u001b[39m\n\u001b[90mstderr\u001b[2m | src/app.test.ts\u001b[2m > \u001b[22m\u001b[2mnimbus-books\u001b[2m > \u001b[22m\u001b[2mGET /health → 503 naming the missing variable when CATALOG_MODE is absent\n\u001b[22m\u001b[39m[health] FAIL missing required env: CATALOG_MODE\n\u001b[90mstderr\u001b[2m | src/app.test.ts\u001b[2m > \u001b[22m\u001b[2mnimbus-books\u001b[2m > \u001b[22m\u001b[2mGET /api/books → 500 when configuration is missing\n\u001b[22m\u001b[39m[books] cannot serve catalog: missing CATALOG_MODE\n \u001b[32m✓\u001b[39m src/app.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 24\u001b[2mms\u001b[22m\u001b[39m\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m6 passed\u001b[39m\u001b[22m\u001b[90m (6)\u001b[39m\n\u001b[2m   Start at \u001b[22m 02:07:14\n\u001b[2m   Duration \u001b[22m 1.05s\u001b[2m (transform 89ms, setup 0ms, collect 131ms, tests 24ms, environment 0ms, prepare 362ms)\u001b[22m"
+        }
+      ]
+    },
+    {
+      "id": "evt_0b2d255ac3",
+      "at": "2026-09-26T20:37:15.448Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "deploy.started",
+      "message": "Deploying bobops-nimbus-books to aws (lambda, us-east-1)",
+      "evidence": []
+    },
+    {
+      "id": "evt_3f060178cd",
+      "at": "2026-09-26T20:37:15.451Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "build.started",
+      "message": "Bundling demo-service/src/lambda.ts with esbuild (ESM, node22)",
+      "evidence": []
+    },
+    {
+      "id": "evt_ffffa845b1",
+      "at": "2026-09-26T20:37:15.527Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "build.completed",
+      "message": "Lambda bundle ready (9.9 KiB zipped)",
+      "evidence": []
+    },
+    {
+      "id": "evt_9810773995",
+      "at": "2026-09-26T20:37:17.260Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "provision.started",
+      "message": "Updating existing Lambda function bobops-nimbus-books in us-east-1",
+      "evidence": []
+    },
+    {
+      "id": "evt_9e3eae34d0",
+      "at": "2026-09-26T20:37:23.699Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "provision.completed",
+      "message": "Alias live → version 5 (lambda)",
+      "evidence": []
+    },
+    {
+      "id": "evt_a8855229d8",
+      "at": "2026-09-26T20:37:23.708Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "deploy.completed",
+      "message": "aws is serving bobops-nimbus-books at https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/ (revision 5)",
+      "evidence": [
+        {
+          "label": "Lambda deployment",
+          "source": "AWS Lambda API",
+          "capturedAt": "2026-09-26T20:37:23.704Z",
+          "data": {
+            "functionName": "bobops-nimbus-books",
+            "version": "5",
+            "alias": "live",
+            "service": "lambda",
+            "url": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+            "runtime": "nodejs22.x",
+            "region": "us-east-1",
+            "bundleBytes": 10153
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_d41c46bee4",
+      "at": "2026-09-26T20:37:27.150Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "verification",
+      "type": "verify.passed",
+      "message": "aws healthy — HTTP 200 in 2685 ms (revision 1.0.0)",
+      "evidence": [
+        {
+          "label": "HTTP health probe",
+          "source": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+          "capturedAt": "2026-09-26T20:37:27.150Z",
+          "data": {
+            "id": "773c7a9d-a191-44f5-979c-5bd1abf721e2",
+            "provider": "aws",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+            "ok": true,
+            "statusCode": 200,
+            "latencyMs": 2685,
+            "revision": "1.0.0",
+            "body": {
+              "status": "healthy",
+              "service": "nimbus-books",
+              "revision": "1.0.0",
+              "provider": "aws",
+              "startedAt": "2026-09-26T20:37:25.240Z",
+              "checks": {
+                "config": {
+                  "ok": true
+                }
+              }
+            },
+            "checkedAt": "2026-09-26T20:37:23.716Z"
+          }
+        },
+        {
+          "label": "Provider-native status",
+          "source": "aws API",
+          "capturedAt": "2026-09-26T20:37:27.150Z",
+          "data": {
+            "state": "ready",
+            "revision": "5",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+            "env": {
+              "DEPLOY_PROVIDER": "aws",
+              "ADMIN_TOKEN": "••••redacted",
+              "CATALOG_MODE": "featured",
+              "APP_VERSION": "1.0.0"
+            },
+            "raw": {
+              "runtime": "nodejs22.x",
+              "state": "Active",
+              "lastUpdateStatus": "Successful",
+              "lastModified": "2026-09-26T20:37:19.000+0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_a53651a092",
+      "at": "2026-09-26T20:37:28.090Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "provider.progress",
+      "message": "Updating Lambda bobops-nimbus-books configuration (remove CATALOG_MODE) and publishing a new version",
+      "evidence": []
+    },
+    {
+      "id": "evt_034b7b89a5",
+      "at": "2026-09-26T20:37:32.112Z",
+      "runId": "run_a61f4e599d",
+      "actor": "human",
+      "kind": "action",
+      "type": "fault.injected",
+      "message": "Controlled fault injected by the presenter: removed CATALOG_MODE from aws/bobops-nimbus-books (revision 6)",
+      "evidence": []
+    },
+    {
+      "id": "evt_4d35ad0064",
+      "at": "2026-09-26T20:37:45.087Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "verification",
+      "type": "verify.failed",
+      "message": "aws UNHEALTHY — HTTP 503 at https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+      "evidence": [
+        {
+          "label": "HTTP health probe",
+          "source": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+          "capturedAt": "2026-09-26T20:37:45.087Z",
+          "data": {
+            "id": "a91158f8-11c4-4950-ba0f-d7df0d09d606",
+            "provider": "aws",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+            "ok": false,
+            "statusCode": 503,
+            "latencyMs": 5317,
+            "revision": "1.0.0",
+            "body": {
+              "status": "unhealthy",
+              "service": "nimbus-books",
+              "revision": "1.0.0",
+              "provider": "aws",
+              "startedAt": "2026-09-26T20:37:32.796Z",
+              "checks": {
+                "config": {
+                  "ok": false,
+                  "missing": [
+                    "CATALOG_MODE"
+                  ],
+                  "hint": "Set the missing environment variables and redeploy"
+                }
+              }
+            },
+            "checkedAt": "2026-09-26T20:37:38.936Z"
+          }
+        },
+        {
+          "label": "Provider-native status",
+          "source": "aws API",
+          "capturedAt": "2026-09-26T20:37:45.087Z",
+          "data": {
+            "state": "ready",
+            "revision": "6",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+            "env": {
+              "DEPLOY_PROVIDER": "aws",
+              "ADMIN_TOKEN": "••••redacted",
+              "APP_VERSION": "1.0.0"
+            },
+            "raw": {
+              "runtime": "nodejs22.x",
+              "state": "Active",
+              "lastUpdateStatus": "Successful",
+              "lastModified": "2026-09-26T20:37:28.000+0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_69182a443b",
+      "at": "2026-09-26T20:37:45.099Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "observation",
+      "type": "incident.opened",
+      "message": "Incident inc_7e7ee0234c opened by the orchestrator: aws failed 1/1 probes",
+      "evidence": [
+        {
+          "label": "Failing probes",
+          "source": "orchestrator",
+          "capturedAt": "2026-09-26T20:37:45.099Z",
+          "data": [
+            {
+              "id": "a91158f8-11c4-4950-ba0f-d7df0d09d606",
+              "provider": "aws",
+              "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+              "ok": false,
+              "statusCode": 503,
+              "latencyMs": 5317,
+              "revision": "1.0.0",
+              "body": {
+                "status": "unhealthy",
+                "service": "nimbus-books",
+                "revision": "1.0.0",
+                "provider": "aws",
+                "startedAt": "2026-09-26T20:37:32.796Z",
+                "checks": {
+                  "config": {
+                    "ok": false,
+                    "missing": [
+                      "CATALOG_MODE"
+                    ],
+                    "hint": "Set the missing environment variables and redeploy"
+                  }
+                }
+              },
+              "checkedAt": "2026-09-26T20:37:38.936Z",
+              "runId": "run_a61f4e599d"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "evt_36c16de625",
+      "at": "2026-09-26T20:37:45.135Z",
+      "runId": "run_a61f4e599d",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "incident.diagnosed",
+      "message": "Diagnosis (high confidence): CATALOG_MODE is missing from the running revision",
+      "evidence": [
+        {
+          "label": "Diagnosis",
+          "source": "bob:incident-investigator",
+          "capturedAt": "2026-09-26T20:37:45.135Z",
+          "data": {
+            "summary": "Configuration drift",
+            "rootCause": "CATALOG_MODE is missing from the running revision",
+            "confidence": "high",
+            "evidence": [
+              "probe body: checks.config.missing=[CATALOG_MODE]",
+              "approved plan env: CATALOG_MODE=featured"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_7526d66b3a",
+      "at": "2026-09-26T20:37:45.159Z",
+      "runId": "run_a61f4e599d",
+      "actor": "bob",
+      "kind": "proposal",
+      "type": "remediation.proposed",
+      "message": "Bob proposes: Set CATALOG_MODE=featured (risk low) — Restore the approved configuration value",
+      "evidence": []
+    },
+    {
+      "id": "evt_20358d0ba2",
+      "at": "2026-09-26T20:37:45.164Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "proposal",
+      "type": "approval.requested",
+      "message": "Human approval required for the remediation (hash 925ffcc73d50…)",
+      "evidence": []
+    },
+    {
+      "id": "evt_0e4e17bf5b",
+      "at": "2026-09-26T20:37:45.182Z",
+      "runId": "run_a61f4e599d",
+      "actor": "human",
+      "kind": "action",
+      "type": "approval.decided",
+      "message": "e2e-script approved the remediation",
+      "evidence": []
+    },
+    {
+      "id": "evt_839ad17272",
+      "at": "2026-09-26T20:37:45.201Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "action",
+      "type": "remediation.started",
+      "message": "Executing approved remediation: Set CATALOG_MODE=featured on aws/bobops-nimbus-books",
+      "evidence": []
+    },
+    {
+      "id": "evt_c61674cea7",
+      "at": "2026-09-26T20:37:45.824Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "provider.progress",
+      "message": "Updating Lambda bobops-nimbus-books configuration (set CATALOG_MODE) and publishing a new version",
+      "evidence": []
+    },
+    {
+      "id": "evt_cff2d3f3a6",
+      "at": "2026-09-26T20:37:49.708Z",
+      "runId": "run_a61f4e599d",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "remediation.completed",
+      "message": "aws change applied — new revision 7",
+      "evidence": [
+        {
+          "label": "Lambda configuration change",
+          "source": "AWS Lambda API",
+          "capturedAt": "2026-09-26T20:37:49.703Z",
+          "data": {
+            "functionName": "bobops-nimbus-books",
+            "version": "7",
+            "service": "lambda",
+            "change": "set CATALOG_MODE"
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_6a978cbf76",
+      "at": "2026-09-26T20:37:52.541Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "verification",
+      "type": "verify.passed",
+      "message": "aws healthy — HTTP 200 in 2112 ms (revision 1.0.0)",
+      "evidence": [
+        {
+          "label": "HTTP health probe",
+          "source": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+          "capturedAt": "2026-09-26T20:37:52.541Z",
+          "data": {
+            "id": "bc058318-102f-4e8f-ae9b-5ff03e3019f7",
+            "provider": "aws",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+            "ok": true,
+            "statusCode": 200,
+            "latencyMs": 2112,
+            "revision": "1.0.0",
+            "body": {
+              "status": "healthy",
+              "service": "nimbus-books",
+              "revision": "1.0.0",
+              "provider": "aws",
+              "startedAt": "2026-09-26T20:37:50.645Z",
+              "checks": {
+                "config": {
+                  "ok": true
+                }
+              }
+            },
+            "checkedAt": "2026-09-26T20:37:49.715Z"
+          }
+        },
+        {
+          "label": "Provider-native status",
+          "source": "aws API",
+          "capturedAt": "2026-09-26T20:37:52.541Z",
+          "data": {
+            "state": "ready",
+            "revision": "7",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+            "env": {
+              "DEPLOY_PROVIDER": "aws",
+              "ADMIN_TOKEN": "••••redacted",
+              "CATALOG_MODE": "featured",
+              "APP_VERSION": "1.0.0"
+            },
+            "raw": {
+              "runtime": "nodejs22.x",
+              "state": "Active",
+              "lastUpdateStatus": "Successful",
+              "lastModified": "2026-09-26T20:37:45.000+0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_fa157d6110",
+      "at": "2026-09-26T20:37:52.554Z",
+      "runId": "run_a61f4e599d",
+      "actor": "orchestrator",
+      "kind": "verification",
+      "type": "incident.resolved",
+      "message": "Recovered and re-verified: every endpoint is healthy. Time to recovery 7s",
+      "evidence": [
+        {
+          "label": "Post-remediation probe (aws)",
+          "source": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+          "capturedAt": "2026-09-26T20:37:52.554Z",
+          "data": {
+            "id": "bc058318-102f-4e8f-ae9b-5ff03e3019f7",
+            "provider": "aws",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+            "ok": true,
+            "statusCode": 200,
+            "latencyMs": 2112,
+            "revision": "1.0.0",
+            "body": {
+              "status": "healthy",
+              "service": "nimbus-books",
+              "revision": "1.0.0",
+              "provider": "aws",
+              "startedAt": "2026-09-26T20:37:50.645Z",
+              "checks": {
+                "config": {
+                  "ok": true
+                }
+              }
+            },
+            "checkedAt": "2026-09-26T20:37:49.715Z",
+            "runId": "run_a61f4e599d"
+          }
+        }
+      ]
+    }
+  ]
+}

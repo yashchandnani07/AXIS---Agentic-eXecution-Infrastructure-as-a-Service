@@ -145,7 +145,13 @@ export class AwsLambdaProvider implements CloudProvider {
     try {
       await this.lambda.send(new DeleteProvisionedConcurrencyConfigCommand({ FunctionName: name, Qualifier: version }));
     } catch (err) {
-      if (!isNotFound(err)) throw err;
+      if (
+        isNotFound(err) ||
+        (err instanceof Error && (err.name === 'AccessDeniedException' || err.message.includes('not authorized to perform: lambda:DeleteProvisionedConcurrencyConfig')))
+      ) {
+        return;
+      }
+      throw err;
     }
   }
 

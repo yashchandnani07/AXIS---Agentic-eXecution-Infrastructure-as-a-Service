@@ -9,3 +9,4 @@
  */
 export { IbmCloudProvider, type IbmCloudConfig } from './provider';
 export { extractJson, parseCodeEngineApp, parseRevisions, type ParsedCodeEngineApp } from './parse';
+export { ibmcloud, IbmCloudCliError } from './cli';

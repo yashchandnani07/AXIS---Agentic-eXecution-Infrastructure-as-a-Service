@@ -1,0 +1,57 @@
+/*
+ * @file      apps/control-center/app/globals.css
+ * @phase     P11
+ * @owner     Product & Experience
+ * @purpose   Tailwind v4 + design tokens (IBM Carbon g100-inspired). Tokens become utilities: bg-layer, text-bob, border-line…
+ * @agentNotes Use these tokens only; do not hard-code hex colors in components. Avoid generic gradients and AI slop.
+ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #161616;
+  --color-layer: #262626;
+  --color-layer-2: #393939;
+  --color-line: #393939;
+  --color-line-strong: #6f6f6f;
+  --color-fg: #f4f4f4;
+  --color-muted: #a8a8a8;
+  --color-ibm: #0f62fe;
+  --color-ibm-soft: #78a9ff;
+  --color-bob: #be95ff;
+  --color-aws: #ff9900;
+  --color-ok: #42be65;
+  --color-warn: #f1c21b;
+  --color-bad: #fa4d56;
+  --color-info: #4589ff;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: rgba(15, 98, 254, 0.4);
+  color: #ffffff;
+}
+
+/* Crisp technical scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #161616;
+}
+::-webkit-scrollbar-thumb {
+  background: #393939;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6f6f6f;
+}

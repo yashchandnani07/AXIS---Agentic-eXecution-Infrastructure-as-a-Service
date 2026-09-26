@@ -20,6 +20,7 @@ import { eventRoutes } from './routes/events';
 import { incidentRoutes } from './routes/incidents';
 import { providerRoutes } from './routes/providers';
 import { runRoutes } from './routes/runs';
+import { watsonRoutes } from './routes/watson';
 
 export function createApp(deps: Deps) {
   const app = new Hono();
@@ -33,13 +34,14 @@ export function createApp(deps: Deps) {
     }),
   );
 
-  app.get('/api/health', (c) => c.json({ ok: true, service: 'bobops-orchestrator', time: new Date().toISOString() }));
+  app.get('/api/health', (c) => c.json({ ok: true, service: 'axis-orchestrator', time: new Date().toISOString() }));
   app.route('/api/runs', runRoutes(deps));
   app.route('/api/approvals', approvalRoutes(deps));
   app.route('/api/incidents', incidentRoutes(deps));
   app.route('/api/providers', providerRoutes(deps));
   app.route('/api/events', eventRoutes(deps));
   app.route('/api/demo', demoRoutes(deps));
+  app.route('/api/watson', watsonRoutes(deps));
 
   app.onError((err, c) => {
     if (err instanceof HttpError) return c.json({ error: err.message, code: err.code }, err.status as ContentfulStatusCode);

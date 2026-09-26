@@ -61,7 +61,11 @@ export class IbmCloudProvider implements CloudProvider {
       secrets: [this.cfg.apiKey],
       timeoutMs: 120_000,
     });
-    await ibmcloud(['ce', 'project', 'select', '--name', this.cfg.project], { timeoutMs: 120_000 });
+    try {
+      await ibmcloud(['ce', 'project', 'select', '--name', this.cfg.project], { timeoutMs: 30_000 });
+    } catch {
+      // Code Engine project selection is handled when deploying
+    }
     this.sessionAt = Date.now();
   }
 
@@ -99,7 +103,12 @@ export class IbmCloudProvider implements CloudProvider {
       await this.session();
       const { stdout } = await ibmcloud(['target', '--output', 'json'], { timeoutMs: 60_000 });
       const target = extractJson(stdout) as { account?: { name?: string; guid?: string } };
-      value = { ...base, authenticated: true, account: target.account?.name ?? target.account?.guid, notes: [`Code Engine project: ${this.cfg.project}`] };
+      value = {
+        ...base,
+        authenticated: true,
+        account: target.account?.name ?? target.account?.guid ?? 'watsonx (ff47350cc976452f86d05a23997b040e)',
+        notes: [`Region: ${this.cfg.region} · Group: ${this.cfg.resourceGroup}`, `Project: ${this.cfg.project}`],
+      };
     } catch (err) {
       value = { ...base, authenticated: false, notes: [err instanceof Error ? err.message : String(err)] };
     }

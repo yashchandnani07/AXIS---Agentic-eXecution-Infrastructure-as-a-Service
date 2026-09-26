@@ -1,0 +1,36 @@
+[
+  {
+    "provider": "ibm-cloud",
+    "displayName": "IBM Cloud Code Engine",
+    "region": "us-south",
+    "services": [
+      "code-engine",
+      "container-registry",
+      "code-engine-secrets"
+    ],
+    "offeredServices": [
+      "code-engine",
+      "code-engine-scale-to-zero"
+    ],
+    "supportsRollback": true,
+    "authenticated": false,
+    "notes": []
+  },
+  {
+    "provider": "aws",
+    "displayName": "AWS Lambda + Function URL",
+    "region": "us-east-1",
+    "services": [
+      "lambda",
+      "lambda-function-url",
+      "cloudwatch-logs"
+    ],
+    "offeredServices": [
+      "lambda",
+      "lambda-provisioned"
+    ],
+    "supportsRollback": true,
+    "authenticated": true,
+    "notes": []
+  }
+]

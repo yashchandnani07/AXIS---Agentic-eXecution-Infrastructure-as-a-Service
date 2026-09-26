@@ -1,0 +1,96 @@
+/**
+ * @file      apps/control-center/app/run/page.tsx
+ * @phase     P11
+ * @owner     Product & Experience
+ * @purpose   One run, end to end: header, lifecycle, metrics, approvals, incidents, environments, plan, analysis, logs, audit.
+ * @depends   next/navigation, @/lib/use-run, components
+ * @usedBy    route "/run?id=<runId>[&demo=1]" (query param keeps static export simple)
+ * @agentNotes Order = what needs a human first (approvals, incidents), then evidence. `demo=1` shows the fault control.
+ */
+'use client';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
+import { AnalysisPanel } from '@/components/analysis-panel';
+import { ApprovalQueue } from '@/components/approval-queue';
+import { AuditTrail } from '@/components/audit-trail';
+import { DeploymentsPanel } from '@/components/deployments-panel';
+import { IncidentsPanel } from '@/components/incidents-panel';
+import { LifecycleStepper } from '@/components/lifecycle-stepper';
+import { LogsPanel } from '@/components/logs-panel';
+import { MetricsStrip } from '@/components/metrics-strip';
+import { PlanPanel } from '@/components/plan-panel';
+import { StateBadge } from '@/components/ui';
+import { WatsonAgent } from '@/components/watson-agent';
+import { useRun } from '@/lib/use-run';
+
+export default function RunPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-muted font-mono">Loading run details…</p>}>
+      <RunView />
+    </Suspense>
+  );
+}
+
+function RunView() {
+  const params = useSearchParams();
+  const id = params.get('id');
+  const demo = params.get('demo') === '1';
+  const { data, error, refresh } = useRun(id);
+
+  if (!id) {
+    return (
+      <div className="py-8 text-center">
+        <p className="text-sm text-muted">
+          No run selected. <Link href="/" className="text-ibm-soft hover:underline">Back to all runs</Link>
+        </p>
+      </div>
+    );
+  }
+  if (error && !data) return <p className="text-sm text-bad font-mono">Could not load run {id}: {error}</p>;
+  if (!data) return <p className="text-sm text-muted font-mono">Loading run {id}…</p>;
+
+  const latest = data.events.at(-1);
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+        <div>
+          <Link href="/" className="text-xs text-muted hover:text-fg font-mono inline-flex items-center gap-1 transition-colors">
+            ← Back to AXIS Overview
+          </Link>
+          <h1 className="mt-1.5 text-2xl font-semibold text-fg flex items-center gap-3">
+            <span>{data.run.projectName}</span>
+            <span className="font-mono text-xs text-muted font-normal border border-line bg-layer px-2 py-0.5 rounded">{data.run.id}</span>
+          </h1>
+          <p className="mt-1.5 text-xs text-muted leading-relaxed">
+            {data.run.objective} · <span className="font-mono text-fg">{data.run.repoPath}</span> · <span className="text-fg">{data.run.targets.join(' + ')}</span>
+            {' · sentinel check-in every '}
+            <span className="font-mono text-fg font-medium">{data.run.sentinelIntervalMinutes} min</span>
+          </p>
+        </div>
+        <div className="text-right">
+          <StateBadge state={data.run.state} />
+          {latest && <p className="mt-2 max-w-md text-xs text-muted truncate">Latest: {latest.message}</p>}
+        </div>
+      </header>
+
+      <LifecycleStepper agg={data} />
+      <MetricsStrip agg={data} />
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="space-y-6 xl:col-span-2">
+          <ApprovalQueue agg={data} onDecided={refresh} />
+          <IncidentsPanel agg={data} onChanged={refresh} />
+          <DeploymentsPanel agg={data} onChanged={refresh} demo={demo} />
+          <PlanPanel agg={data} />
+          <AnalysisPanel agg={data} />
+          <LogsPanel agg={data} />
+        </div>
+        <div className="space-y-6">
+          <AuditTrail agg={data} />
+          <WatsonAgent runId={data.run.id} />
+        </div>
+      </div>
+    </div>
+  );
+}
