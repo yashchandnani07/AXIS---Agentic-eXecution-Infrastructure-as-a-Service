@@ -344,12 +344,16 @@ if (deps.github) {
  * @file      scripts/sentinel/run-sentinel.ts
  * @phase     P12
  * @owner     Product & Experience
- * @purpose   Independent cross-cloud health sentinel (runs in GitHub Actions every 5 min or on dispatch). Probes each target
- *            N times; after THRESHOLD consecutive failures opens (or comments on) a GitHub issue with JSON evidence;
- *            writes sentinel-report.json and a job summary. Exit code 1 when an incident exists (red run = visible).
+ * @purpose   Independent cross-cloud health sentinel. The workflow's cron always fires every 5 minutes (GitHub's fastest
+ *            schedule), but each target is only ACTUALLY PROBED when shouldProbeNow() says its user-chosen
+ *            intervalMinutes has elapsed — so "check every 15/30/60 minutes" is a real, user-set cadence, not a fixed 5.
+ *            For targets that are due: probes N times; after THRESHOLD consecutive failures opens (or comments on) a
+ *            GitHub issue with JSON evidence. Always writes sentinel-report.json and a job summary. Exit code 1 only
+ *            when an incident exists (red run = visible); a quiet or skipped tick exits 0.
  * @depends   ../lib/env, @bobops/core (probe + sentinel format), @bobops/github, zod
  * @usedBy    .github/workflows/health-sentinel.yml, `pnpm sentinel` (local dry run)
- * @agentNotes Never close issues here — only the orchestrator closes them after a VERIFIED recovery.
+ * @agentNotes Never close issues here — only the orchestrator closes them after a VERIFIED recovery. shouldProbeNow()
+ *             needs no external state — every runner agrees on the same wall-clock tick (see packages/core/src/sentinel.ts).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -361,6 +365,7 @@ import {
   incidentTitle,
   probeHealth,
   renderStepSummary,
+  shouldProbeNow,
   type HealthCheck,
   type SentinelIncidentPayload,
   type SentinelResult,
@@ -381,6 +386,44 @@ function loadTargets(): SentinelTarget[] {
   return z.array(SentinelTargetSchema).parse(JSON.parse(raw));
 }
 
+async function probeTarget(target: SentinelTarget, gh: GitHubClient | null): Promise<SentinelResult> {
+  const probes: HealthCheck[] = [];
+  for (let i = 0; i < ATTEMPTS; i++) {
+    const probe = await probeHealth({ provider: target.provider, endpoint: target.endpoint, healthPath: target.healthPath, timeoutMs: 10_000 });
+    probes.push({ ...probe, runId: target.runId });
+    console.log(`[${target.provider}] attempt ${i + 1}/${ATTEMPTS}: ${probe.ok ? 'OK' : 'FAIL'} ${probe.statusCode} ${probe.latencyMs}ms`);
+    if (i < ATTEMPTS - 1) await sleep(GAP_MS);
+  }
+  const streak = consecutiveFailures(probes);
+  const incident = streak >= THRESHOLD;
+  let issueUrl: string | undefined;
+  if (incident && gh) {
+    const payload: SentinelIncidentPayload = {
+      version: 1,
+      runId: target.runId,
+      provider: target.provider,
+      appName: target.appName,
+      endpoint: target.endpoint,
+      threshold: THRESHOLD,
+      consecutiveFailures: streak,
+      probes,
+      detectedAt: new Date().toISOString(),
+      workflowRunUrl: process.env.WORKFLOW_RUN_URL,
+      commitSha: process.env.GITHUB_SHA,
+    };
+    const title = incidentTitle(target);
+    const existing = await gh.findOpenIssueByTitle(title);
+    if (existing) {
+      await gh.comment(existing.number, `Still failing at ${payload.detectedAt} (${streak} consecutive failures). ${payload.workflowRunUrl ?? ''}`);
+      issueUrl = existing.url;
+    } else {
+      issueUrl = (await gh.openIncidentIssue(title, payload)).url;
+    }
+    console.log(`🚨 incident for ${target.provider}/${target.appName}: ${issueUrl}`);
+  }
+  return { target, probes, incident, issueUrl };
+}
+
 async function main() {
   const targets = loadTargets();
   if (!targets.length) {
@@ -389,47 +432,19 @@ async function main() {
   }
   const ghConfig = githubConfigFromEnv();
   const gh = ghConfig ? new GitHubClient(ghConfig) : null;
+  const now = new Date();
   const results: SentinelResult[] = [];
 
   for (const target of targets) {
-    const probes: HealthCheck[] = [];
-    for (let i = 0; i < ATTEMPTS; i++) {
-      const probe = await probeHealth({ provider: target.provider, endpoint: target.endpoint, healthPath: target.healthPath, timeoutMs: 10_000 });
-      probes.push({ ...probe, runId: target.runId });
-      console.log(`[${target.provider}] attempt ${i + 1}/${ATTEMPTS}: ${probe.ok ? 'OK' : 'FAIL'} ${probe.statusCode} ${probe.latencyMs}ms`);
-      if (i < ATTEMPTS - 1) await sleep(GAP_MS);
+    if (!shouldProbeNow(target, now)) {
+      console.log(`[${target.provider}/${target.appName}] not due yet (checks in every ${target.intervalMinutes} min) — skipping this tick`);
+      results.push({ target, probes: [], incident: false, skipped: true });
+      continue;
     }
-    const streak = consecutiveFailures(probes);
-    const incident = streak >= THRESHOLD;
-    let issueUrl: string | undefined;
-    if (incident && gh) {
-      const payload: SentinelIncidentPayload = {
-        version: 1,
-        runId: target.runId,
-        provider: target.provider,
-        appName: target.appName,
-        endpoint: target.endpoint,
-        threshold: THRESHOLD,
-        consecutiveFailures: streak,
-        probes,
-        detectedAt: new Date().toISOString(),
-        workflowRunUrl: process.env.WORKFLOW_RUN_URL,
-        commitSha: process.env.GITHUB_SHA,
-      };
-      const title = incidentTitle(target);
-      const existing = await gh.findOpenIssueByTitle(title);
-      if (existing) {
-        await gh.comment(existing.number, `Still failing at ${payload.detectedAt} (${streak} consecutive failures). ${payload.workflowRunUrl ?? ''}`);
-        issueUrl = existing.url;
-      } else {
-        issueUrl = (await gh.openIncidentIssue(title, payload)).url;
-      }
-      console.log(`🚨 incident for ${target.provider}/${target.appName}: ${issueUrl}`);
-    }
-    results.push({ target, probes, incident, issueUrl });
+    results.push(await probeTarget(target, gh));
   }
 
-  fs.writeFileSync(REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), threshold: THRESHOLD, results }, null, 2));
+  fs.writeFileSync(REPORT, JSON.stringify({ generatedAt: now.toISOString(), threshold: THRESHOLD, results }, null, 2));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, renderStepSummary(results));
   if (results.some((r) => r.incident)) {
     console.error('Sentinel detected at least one incident.');
@@ -514,8 +529,11 @@ jobs:
 # @file      .github/workflows/health-sentinel.yml
 # @phase     P12
 # @owner     Product & Experience
-# @purpose   Independent cross-cloud health sentinel: every 5 min (+ manual dispatch for the demo). Opens GitHub issues with
-#            JSON evidence after 3 consecutive failures; the orchestrator imports them as incidents.
+# @purpose   Independent cross-cloud health sentinel. This cron is GitHub's FASTEST possible schedule (every 5 min) —
+#            it is a floor, not the user's chosen cadence. Each run's actual check-in interval (5/15/30/60 min, chosen
+#            by the user when Bob created the run) is honored by run-sentinel.ts's shouldProbeNow(), which skips a
+#            target's probe on ticks that don't land on its interval. Opens GitHub issues with JSON evidence after 3
+#            consecutive failures on a tick where the target WAS due; the orchestrator imports them as incidents.
 # @agentNotes Scheduled runs can be delayed by GitHub — that's why the demo uses workflow_dispatch and why this is NOT the
 #             only health mechanism (orchestrator verify + provider-native status are first line). Disable after the event:
 #             gh workflow disable health-sentinel.yml
@@ -673,6 +691,16 @@ if (!check.ok) process.exit(1);
 - [ ] **Step 2:** `pnpm demo:golden`, then `pnpm dev:api`. Expected log: `GitHub sentinel sync: ON (...)`.
 - [ ] **Step 3:** `pnpm api:e2e --targets aws`. Expected: the run is healthy, and its audit trail contains `sentinel.armed`.
   `gh variable list` shows `SENTINEL_TARGETS`.
+- [ ] **Step 3b (verify the user-defined interval is honored, not just the default):** Create a second run with a
+  30-minute cadence directly against the API:
+  ```powershell
+  Invoke-RestMethod -Method Post -Uri http://localhost:4000/api/runs -ContentType 'application/json' -Body '{"projectName":"nimbus-books","repoPath":"apps/demo-service","objective":"interval test","targets":["aws"],"sentinelIntervalMinutes":30}'
+  ```
+  Deploy it the same way as Step 3 (analysis → plan → approve → execute for that run id), then `gh variable get SENTINEL_TARGETS`
+  and confirm the new target's `intervalMinutes` is `30`. Run `gh workflow run health-sentinel.yml; gh run watch` at a
+  moment that is NOT a multiple of 30 minutes past the hour — expect that target's row in the job summary to read
+  `⏭️ not due (every 30m)` while the first (5-minute) run still shows `✅ healthy`. This proves the fixed 5-minute cron
+  correctly samples down to a slower, user-chosen cadence with no extra state.
 - [ ] **Step 4:** `gh workflow run health-sentinel.yml`, then `gh run watch`. Expected: a green run whose job summary shows
   `✅ healthy`.
 - [ ] **Step 5:** `pnpm demo:fault --provider aws`, then `gh workflow run health-sentinel.yml` and `gh run watch`.
@@ -692,7 +720,8 @@ if (!check.ok) process.exit(1);
 BUILT:
   - packages/github (Octokit: issues, label, comments, close, SENTINEL_TARGETS variable)
   - orchestrator: GitHub port, sentinel arming after healthy deploys, 60 s incident sync, auto-close on verified recovery
-  - scripts/sentinel/run-sentinel.ts; workflows validate.yml, health-sentinel.yml (*/5 + dispatch), deploy.yml (COULD)
+  - scripts/sentinel/run-sentinel.ts (honors each run's user-defined sentinelIntervalMinutes via shouldProbeNow, on top
+    of GitHub's fixed 5-min cron floor); workflows validate.yml, health-sentinel.yml (*/5 + dispatch), deploy.yml (COULD)
 DO THIS (human):
   1. .env GITHUB_TOKEN/OWNER/REPO; pnpm dev:api; pnpm api:e2e --targets aws
   2. gh workflow run health-sentinel.yml; gh run watch   (green)

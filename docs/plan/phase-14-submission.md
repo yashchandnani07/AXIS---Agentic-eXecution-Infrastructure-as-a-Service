@@ -169,11 +169,17 @@ deploying through separate consoles, and then digging through logs when it break
 for every release. BobOps turns that into **one conversation with Bob plus two clicks from a human**.
 
 ## What happens in the demo (real clouds, no mocks)
-1. `/deploy apps/demo-service`: **4 specialist subagents run in parallel** (application analyst, cloud architect, security reviewer, release verifier).
-2. Bob **generates the missing deployment assets**, synthesizes **one plan**, and submits it. Bob then tries to deploy early,
-   and the orchestrator answers **403 `guard.blocked`**. Approvals are bound to the plan's SHA-256.
-3. The developer approves in the Control Center. **Tests gate the release**, then **IBM Cloud Code Engine** (built from source) and
-   **AWS Lambda** deploy in parallel, and both are verified with HTTP and provider-native evidence.
+1. `/deploy apps/demo-service`, and Bob asks how often to check in on the deployment afterward (5/15/30/60 min — the
+   user's choice, honored by the GitHub sentinel's cron sampling). Then **4 specialist subagents run in parallel**
+   (application analyst, cloud architect, security reviewer, release verifier).
+2. The cloud-architect specialist doesn't just pick "IBM Cloud + AWS" — for EACH cloud it chooses between two real,
+   deployable architectures (always-on vs. scale-to-zero on Code Engine; on-demand vs. provisioned-concurrency on
+   Lambda) and states why, citing the app's traffic and latency profile. Bob **generates the missing deployment
+   assets**, synthesizes **one plan** carrying that rationale, and submits it. Bob then tries to deploy early, and the
+   orchestrator answers **403 `guard.blocked`**. Approvals are bound to the plan's SHA-256.
+3. The developer reviews the architecture choice and its rationale in the Control Center, then approves. **Tests gate
+   the release**, then **IBM Cloud Code Engine** (built from source) and **AWS Lambda** deploy in parallel on the
+   chosen architectures, and both are verified with HTTP and provider-native evidence.
 4. A controlled fault. The **GitHub Actions sentinel** opens an issue with JSON evidence, which becomes an incident in the Control Center.
 5. `/investigate`: Bob correlates the probe body, logs, code and approved plan, records a **cited diagnosis**, and proposes
    the smallest safe fix. After human approval it runs the fix and re-verifies, and **the issue closes itself** with a recovery report.
@@ -324,6 +330,7 @@ Also in V2: AWS Secrets Manager for Lambda secrets, a Bob Shell (`bob run`) pre-
 | Likely question | Answer |
 |---|---|
 | "Isn't this just CI/CD?" | CI/CD executes a pipeline someone already wrote. BobOps *understands* an unfamiliar repo, writes the missing assets, designs a two-cloud plan, and diagnoses and recovers incidents with cited evidence. The pipeline is an output, not the input. |
+| "Isn't the cloud pairing (IBM + AWS) fixed, so there's nothing to decide?" | The *clouds* come from what the developer asks for, but the *architecture on each cloud* is a real decision: every cloud offers two genuinely different, independently deployable options (always-on vs. scale-to-zero on Code Engine; on-demand vs. provisioned-concurrency on Lambda), and the cloud-architect specialist picks one per cloud from the app's actual traffic/latency profile — visible as a required, schema-validated rationale in the plan, not a label. Adding a third or fourth cloud (Vercel/Railway, V2) is a new adapter behind the same contract; it doesn't change this reasoning step. |
 | "Is Bob really doing the work?" | Yes. Look at the Bob task summaries, the audit trail events with actor `bob`, and the MCP tool calls. The orchestrator executes, but only Bob's approved plans. |
 | "What if Bob hallucinates?" | Schemas reject invalid plans (validation errors go back to Bob), and deploys need hash-bound human approval. Health claims come from probes, not from Bob. Diagnosis needs 2 or more evidence items. |
 | "Why not full autonomy?" | Irreversible and costly actions stay human-approved (PRD scope). Everything else is automated. |

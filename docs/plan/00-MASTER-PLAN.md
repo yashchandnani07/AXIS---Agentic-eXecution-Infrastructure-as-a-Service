@@ -75,9 +75,12 @@ with docs and **every Bob IDE task session summary screenshot**. Phase 14 produc
 
 ### 3.1 The five "wow moments" the demo must hit (in this order)
 
-1. **Parallel specialists.** You type `/deploy apps/demo-service` in Bob. Bob spawns **4 subagents at once** (application
-   analyst, cloud architect, security reviewer, release verifier), and the aggregate subagent panel shows them running in
-   parallel. Bob then synthesizes a single plan.
+1. **Parallel specialists, real architecture decisions.** You type `/deploy apps/demo-service` in Bob. Bob spawns
+   **4 subagents at once** (application analyst, cloud architect, security reviewer, release verifier), and the aggregate
+   subagent panel shows them running in parallel. The cloud-architect specialist doesn't just pick "IBM + AWS" — for
+   EACH cloud it chooses between two real, independently deployable architectures (always-on vs. scale-to-zero on Code
+   Engine; on-demand vs. provisioned-concurrency on Lambda), citing the app's traffic/latency profile. Bob then
+   synthesizes a single plan carrying that rationale as a required, schema-validated field.
 2. **"Bob cannot bypass you."** Bob submits the plan, and the Control Center lights up with an approval card that shows the
    plan hash. Bob tries `devops_execute_plan` early *on purpose*, and the orchestrator answers **403 `guard.blocked`**. That
    event appears in the audit trail.

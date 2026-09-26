@@ -54,12 +54,13 @@ Open `http://localhost:3000`. It should show 2 connected providers and **no runs
 
 | # | You do | Bob / system does | Say (voice-over) |
 |---|---|---|---|
-| 1 | New Bob task → mode **🛰️ Multi-Cloud DevOps Engineer** → type: `/deploy apps/demo-service Deploy Nimbus Books to IBM Cloud and AWS with verified health. Test the approval guard once before I approve.` | Creates a todo list, calls `devops_list_providers` and `devops_create_run` | "One sentence. Bob now owns the release, and I own the decisions." |
+| 1 | New Bob task → mode **🛰️ Multi-Cloud DevOps Engineer** → type: `/deploy apps/demo-service Deploy Nimbus Books to IBM Cloud and AWS with verified health. Test the approval guard once before I approve.` | Bob asks how often you want the sentinel to check in | "One sentence. Bob now owns the release, and I own the decisions." |
+| 1b | Reply: "every 15 minutes" | Creates a todo list, calls `devops_list_providers` and `devops_create_run` with `sentinelIntervalMinutes: 15` | "I get to decide how closely this gets watched, not just whether it gets deployed." |
 | 2 | Point at Bob's subagent panel | **4 specialists run in parallel** (analyst, architect, security, release) | "Four specialist subagents read the repo in parallel. That's real parallelism, not a script." |
 | 3 | Switch to the Control Center run page (Bob gives the link) | UNDERSTAND lights up with specialist cards and evidence refs | "Every finding cites a file." |
 | 4 | Watch the Bob chat | Bob generates the Dockerfile, .dockerignore, .ceignore and src/lambda.ts, then builds to verify | "The repo had no deployment setup. Bob wrote it and proved it builds." |
 | 5 | — | `devops_submit_plan`, then **the guard test: `devops_execute_plan` returns 403**. The audit trail shows a red `guard.blocked`. | "Bob just tried to deploy without me, and the orchestrator refused. Approvals are bound to the plan's hash." |
-| 6 | In the Control Center, review the plan (targets, 🔒 secret refs, risks, cost) → click **Approve** | `devops_wait` returns, then `devops_execute_plan` | "I approve exactly this plan, byte for byte." |
+| 6 | In the Control Center, review the plan — point at the kind badge and rationale text on each cloud's card (🔒 secret refs, risks, cost) → click **Approve** | `devops_wait` returns, then `devops_execute_plan` | "This isn't a fixed template — Bob picked always-on for IBM because it's the judged endpoint, and on-demand for AWS because it's secondary. Two real architectures, one decision each, and I approve exactly this plan, byte for byte." |
 | 7 | Watch the stepper | TEST ✓ → PROVISION → BUILD (Code Engine builds from source, Lambda bundles) → DEPLOY → VERIFY | "Tests gate the release. IBM Cloud Code Engine and AWS Lambda deploy in parallel." |
 | 8 | Click both endpoint links (the /health JSON shows `revision`) | Bob prints the verification table: provider, endpoint, HTTP 200, latency, revision | "Healthy is a claim with evidence: status, latency and revision on both clouds." |
 
@@ -93,6 +94,7 @@ Save these to `evidence/bob-task-summaries/` (the hackathon requires Bob task se
 | `demo-02-parallel-subagents.png` | The aggregate subagent panel with the 4 specialists |
 | `demo-03-guard-blocked.png` | Bob's chat showing the 403 approval_required |
 | `demo-04-verification-table.png` | Bob's final verification table |
+| `demo-04b-architecture-rationale.png` | Control Center plan panel: kind badges + "Why this architecture" rationale per cloud |
 | `demo-05-investigate-task-summary.png` | Bob's task session summary for `/investigate` |
 | `demo-06-diagnosis.png` | Bob's recorded diagnosis with evidence |
 
