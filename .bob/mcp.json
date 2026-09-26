@@ -2,7 +2,9 @@
   "mcpServers": {
     "bobops-orchestrator": {
       "command": "node",
-      "args": ["C:/Users/Yash/Desktop/work/IBM-Bob/apps/bob-mcp/dist/bob-mcp.mjs"],
+      "args": [
+        "C:/Users/Yash/Desktop/work/IBM-Bob/apps/bob-mcp/dist/bob-mcp.mjs"
+      ],
       "env": {
         "ORCHESTRATOR_URL": "http://localhost:4000",
         "CONTROL_CENTER_URL": "http://localhost:3000"

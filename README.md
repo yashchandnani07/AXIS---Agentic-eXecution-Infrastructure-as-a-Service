@@ -112,22 +112,19 @@ AXIS/
 - Node.js `>= 22`
 - pnpm `9.x`
 
-### 1. Installation
+### Quick Onboarding (One-Click)
+For teammates and judges cloning the repository:
+1. Copy shared credentials into `.env` at repo root.
+2. Run the automated onboarding script:
+   - **Windows:** `.\setup.ps1` (or `pnpm onboard`)
+   - **macOS / Linux:** `./setup.sh`
+   *(See [docs/guide/TEAMMATE-ONBOARDING.md](docs/guide/TEAMMATE-ONBOARDING.md) for full guide)*
+
+### Manual Setup Steps
 ```powershell
 pnpm install
-```
-
-### 2. Configure Environment
-```powershell
 Copy-Item .env.example .env
-Copy-Item apps/control-center/.env.local.example apps/control-center/.env.local
-```
-
-### 3. Build & Run Tests
-```powershell
-pnpm test          # Run all 55 unit and lifecycle tests
-pnpm typecheck     # Typecheck all 9 workspace packages
-pnpm build:mcp     # Build single-file MCP bundle for IBM Bob
+pnpm onboard      # configures .env.local, MCP local paths, and runs 55 tests
 ```
 
 ### 4. Start Local Environment
