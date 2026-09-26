@@ -1,0 +1,13 @@
+<!-- @file docs/demo/video-script.md  @phase P14  @purpose 3-minute demo video script with timestamps for AXIS. -->
+# AXIS: 3-Minute Demo Video Script
+
+| Time | Visual | Voice-over |
+|---|---|---|
+| **0:00–0:15** | AXIS Landing Page (`http://localhost:3000`) with sleek dark UI and connected cloud badges | "Shipping apps across multiple clouds usually requires dozens of console clicks, IAM configurations, and tedious troubleshooting. With AXIS, IBM Bob 2.0 acts as your autonomous DevOps engineer, and you remain the decision-maker." |
+| **0:15–0:40** | IBM Bob IDE: `/deploy apps/demo-service` → 4 specialist subagents running in parallel | "With a single command, Bob spawns four specialized subagents in parallel to analyze application dependencies, cloud architecture, security boundaries, and release verification." |
+| **0:40–1:00** | Bob generates deployment assets; orchestrator returns `403 guard.blocked` | "Bob synthesizes missing deployment assets and submits a hash-bound plan. Notice how when Bob attempts to deploy early, the AXIS orchestrator immediately blocks it with 403 Forbidden. Approvals are cryptographically tied to the plan's exact SHA-256 hash." |
+| **1:00–1:25** | AXIS UI: Approve plan → Stepper: PROVISION → BUILD → TEST → DEPLOY → VERIFY (HTTP 200) | "I review the architecture rationale and approve. Vitest tests gate the release, and AWS Lambda deploys live with verified HTTP 200 health." |
+| **1:25–1:45** | Fault injected → GitHub Actions Health Sentinel runs → Issue opened with JSON evidence | "Now let's simulate a 2 AM config drift. We inject a controlled fault. The independent GitHub Actions sentinel detects three consecutive 503 failures and automatically files an incident with structured JSON evidence." |
+| **1:45–2:15** | Bob IDE: `/investigate` → Root cause diagnosis → Propose remediation → Approve in UI → Healed in 7s | "In Bob, we run /investigate. Bob correlates the probe body, logs, and code, diagnosing the missing CATALOG_MODE variable. It proposes a safe remediation. We approve in AXIS, and within 7 seconds, the service is restored to healthy." |
+| **2:15–2:35** | GitHub Issue auto-closed with recovery report; Watson Agent tab in UI | "The GitHub incident issue closes itself with a full MTTR report. Plus, our built-in Watson Agent powered by IBM watsonx.ai is ready to answer any questions about our Cloudant database and system state." |
+| **2:35–3:00** | Audit trail & Metrics Strip (0 cloud consoles opened, 7s MTTR) → Final slide | "Zero cloud consoles opened. Full cryptographic governance. Self-healing multi-cloud in action. This is AXIS, powered by IBM Bob 2.0 and IBM watsonx.ai." |

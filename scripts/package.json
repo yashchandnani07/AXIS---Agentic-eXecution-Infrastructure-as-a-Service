@@ -7,6 +7,7 @@
     "demo:golden": "tsx demo/golden.ts",
     "demo:reset": "tsx demo/reset.ts",
     "demo:fault": "tsx demo/inject-fault.ts",
+    "demo:replay": "tsx demo/build-replay.ts",
     "api:e2e": "tsx demo/api-e2e.ts",
     "smoke:ibm": "tsx smoke/deploy-ibm.ts",
     "smoke:aws": "tsx smoke/deploy-aws.ts",
@@ -19,6 +20,7 @@
     "@bobops/provider-aws": "workspace:*",
     "@bobops/provider-ibm-cloud": "workspace:*",
     "dotenv": "^16.4.7",
+    "execa": "^9.5.2",
     "zod": "^3.25.0"
   }
 }
