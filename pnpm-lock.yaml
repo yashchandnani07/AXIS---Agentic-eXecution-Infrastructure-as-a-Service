@@ -51,6 +51,12 @@ importers:
       '@bobops/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@bobops/provider-aws':
+        specifier: workspace:*
+        version: link:../../packages/provider-aws
+      '@bobops/provider-ibm-cloud':
+        specifier: workspace:*
+        version: link:../../packages/provider-ibm-cloud
       '@hono/node-server':
         specifier: ^1.13.7
         version: 1.19.17(hono@4.13.9)

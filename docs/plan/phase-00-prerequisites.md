@@ -1,12 +1,9 @@
 <!--
 @file     docs/plan/phase-00-prerequisites.md
-@purpose  Human-only setup: tools, accounts, credentials, cloud bootstrap. No code.
+
 @owner    Both (do it together, ~60 min)
 -->
-# Phase 00 — Prerequisites (HUMAN ONLY, ~60 min)
-
-> **Agents:** do not execute this phase. It involves creating accounts and handling credentials, which only humans may do.
-> If a human asks you to help, explain the steps; do not enter keys anywhere.
+# Phase 00 — Prerequisites ( ~60 min)
 
 **Goal:** Every tool is installed, every account is reachable, and `.env` values are ready. At the end, each check command in
 "Verification" prints the expected output.

@@ -6,6 +6,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "demo:golden": "tsx demo/golden.ts",
     "demo:reset": "tsx demo/reset.ts",
+    "demo:fault": "tsx demo/inject-fault.ts",
+    "api:e2e": "tsx demo/api-e2e.ts",
     "smoke:ibm": "tsx smoke/deploy-ibm.ts",
     "smoke:aws": "tsx smoke/deploy-aws.ts"
   },
