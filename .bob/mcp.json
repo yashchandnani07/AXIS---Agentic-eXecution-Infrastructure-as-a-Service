@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "bobops-orchestrator": {
+      "command": "node",
+      "args": ["C:/Users/Yash/Desktop/work/IBM-Bob/apps/bob-mcp/dist/bob-mcp.mjs"],
+      "env": {
+        "ORCHESTRATOR_URL": "http://localhost:4000",
+        "CONTROL_CENTER_URL": "http://localhost:3000"
+      },
+      "timeout": 900,
+      "alwaysAllow": [
+        "devops_list_providers",
+        "devops_list_runs",
+        "devops_get_run",
+        "devops_get_incident",
+        "devops_get_logs",
+        "devops_wait",
+        "devops_log_note",
+        "devops_sync_incidents"
+      ],
+      "disabled": false
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@bobops/bob-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node dist/bob-mcp.mjs",
+    "dev": "tsx src/index.ts",
+    "selftest": "tsx src/selftest.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bobops/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
