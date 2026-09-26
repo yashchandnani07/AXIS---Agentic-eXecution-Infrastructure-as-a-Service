@@ -25,6 +25,7 @@ export function providerRoutes(deps: Deps) {
             authenticated: false,
             region: 'unknown',
             services: [],
+            offeredServices: [],
             supportsRollback: false,
             notes: [err instanceof Error ? err.message : String(err)],
           };

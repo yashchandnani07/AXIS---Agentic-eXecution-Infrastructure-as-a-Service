@@ -2,7 +2,10 @@
  * @file      packages/provider-ibm-cloud/src/provider.ts
  * @phase     P6
  * @owner     Orchestration & Cloud
- * @purpose   IBM Cloud Code Engine implementation of the CloudProvider contract (V1 primary cloud).
+ * @purpose   IBM Cloud Code Engine implementation of the CloudProvider contract (V1 primary cloud). This ONE class serves
+ *            BOTH real IBM architectures in SERVICE_CATALOG — 'code-engine' (always-on, min-scale 1) and
+ *            'code-engine-scale-to-zero' (min-scale 0) — branching on target.service / ref.service. Adding a variant
+ *            never means a new class or new credentials, only a new min-scale mapping in minScaleFor().
  *            deploy = build from local source (Dockerfile) + create/update app; secrets = Code Engine secret;
  *            logs = `ce app logs`; setEnv = `ce app update --env/--env-rm`; rollback = previous revision image.
  * @depends   @bobops/core, ./cli, ./parse, node:fs
@@ -24,6 +27,7 @@ import {
   type ProviderCapabilities,
   type ProviderStatus,
   type Resource,
+  type ServiceId,
   type TargetPlan,
 } from '@bobops/core';
 import { IbmCloudCliError, ibmcloud, tail } from './cli';
@@ -37,6 +41,11 @@ export interface IbmCloudConfig {
 }
 
 const SESSION_TTL_MS = 20 * 60_000;
+
+/** The one place the two IBM architectures differ in the actual `ibmcloud ce app` call: min-scale. */
+function minScaleFor(service: ServiceId): string {
+  return service === 'code-engine-scale-to-zero' ? '0' : '1';
+}
 
 export class IbmCloudProvider implements CloudProvider {
   readonly id = 'ibm-cloud' as const;
@@ -82,6 +91,7 @@ export class IbmCloudProvider implements CloudProvider {
       displayName: 'IBM Cloud Code Engine',
       region: this.cfg.region,
       services: ['code-engine', 'container-registry', 'code-engine-secrets'],
+      offeredServices: ['code-engine', 'code-engine-scale-to-zero'] as ServiceId[],
       supportsRollback: true,
     };
     let value: ProviderCapabilities;
@@ -103,7 +113,7 @@ export class IbmCloudProvider implements CloudProvider {
       { type: 'code-engine-build-run', name: `${target.appName}-build`, action: 'create' },
       { type: 'container-image (ICR)', name: `${target.appName}:<timestamp>`, action: 'create' },
       ...(target.secretRefs.length ? [{ type: 'code-engine-secret', name: `${target.appName}-secrets`, action: 'create' as const }] : []),
-      { type: 'code-engine-app', name: target.appName, action: 'create' },
+      { type: `code-engine-app (min-scale ${minScaleFor(target.service)})`, name: target.appName, action: 'create' },
     ];
   }
 
@@ -140,9 +150,10 @@ export class IbmCloudProvider implements CloudProvider {
 
     for (const [k, v] of Object.entries(target.env)) extra.push('--env', `${k}=${v}`);
     const verb = existing ? 'update' : 'create';
+    const minScale = minScaleFor(target.service);
     progress({
       type: 'build.started',
-      message: `Code Engine is building ${target.appName} from source with its Dockerfile, then will ${verb} the app (typically 2–5 min)`,
+      message: `Code Engine is building ${target.appName} from source with its Dockerfile (${target.service}, min-scale ${minScale}), then will ${verb} the app (typically 2–5 min)`,
     });
     const out = await ibmcloud(
       [
@@ -150,7 +161,7 @@ export class IbmCloudProvider implements CloudProvider {
         '--name', target.appName,
         '--build-source', sourceDir,
         '--port', String(target.port),
-        '--min-scale', '1',
+        '--min-scale', minScale,
         '--max-scale', '2',
         '--cpu', '0.25',
         '--memory', '0.5G',
@@ -190,7 +201,9 @@ export class IbmCloudProvider implements CloudProvider {
 
   async setEnv(ref: DeploymentRef, change: EnvChange, progress: ProgressFn): Promise<DeployResult> {
     await this.session();
-    const args = ['ce', 'app', 'update', '--name', ref.appName, '--wait-timeout', '600'];
+    // Re-assert min-scale from ref.service on every update: idempotent, and guards against another process (or an
+    // earlier manual `ibmcloud ce app update`) having drifted the scaling mode away from what the approved plan chose.
+    const args = ['ce', 'app', 'update', '--name', ref.appName, '--min-scale', minScaleFor(ref.service), '--wait-timeout', '600'];
     for (const [k, v] of Object.entries(change.set ?? {})) args.push('--env', `${k}=${v}`);
     for (const k of change.remove ?? []) args.push('--env-rm', k);
     progress({ type: 'provider.progress', message: `Updating Code Engine app ${ref.appName} configuration (${describeEnvChange(change)}) → new revision` });
@@ -209,7 +222,10 @@ export class IbmCloudProvider implements CloudProvider {
       if (!image) throw new Error('Could not determine the previous revision image; pass toRevision as an image reference');
     }
     progress({ type: 'provider.progress', message: `Rolling back ${ref.appName} to image ${image}` });
-    await ibmcloud(['ce', 'app', 'update', '--name', ref.appName, '--image', image, '--wait-timeout', '600'], { timeoutMs: 15 * 60_000 });
+    await ibmcloud(
+      ['ce', 'app', 'update', '--name', ref.appName, '--image', image, '--min-scale', minScaleFor(ref.service), '--wait-timeout', '600'],
+      { timeoutMs: 15 * 60_000 },
+    );
     return this.resultFor(ref.appName, ref.endpoint, 'Code Engine app after rollback');
   }
 }

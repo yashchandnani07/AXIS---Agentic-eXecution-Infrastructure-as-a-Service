@@ -18,6 +18,7 @@ const agg: RunAggregate = {
     repoPath: 'apps/demo-service',
     objective: 'deploy',
     targets: ['ibm-cloud'],
+    sentinelIntervalMinutes: 5,
     state: 'incident',
     createdAt: '2026-09-27T10:00:00.000Z',
     updatedAt: '2026-09-27T10:00:00.000Z',
@@ -30,7 +31,7 @@ const agg: RunAggregate = {
     { id: 'apr_1', runId: 'run_1', kind: 'remediation', subjectId: 'rem_1', subjectHash: 'h', summary: 'Set CATALOG_MODE=featured', risk: 'low', status: 'pending', requestedAt: 'x' },
   ],
   deployments: [
-    { id: 'dep_1', runId: 'run_1', provider: 'ibm-cloud', appName: 'bobops-nimbus-books', region: 'us-south', healthPath: '/health', status: 'succeeded', endpoint: 'https://x', revision: 'r2', startedAt: 'x' },
+    { id: 'dep_1', runId: 'run_1', provider: 'ibm-cloud', service: 'code-engine', appName: 'bobops-nimbus-books', region: 'us-south', healthPath: '/health', status: 'succeeded', endpoint: 'https://x', revision: 'r2', startedAt: 'x' },
   ],
   healthChecks: [
     { id: 'h1', runId: 'run_1', provider: 'ibm-cloud', endpoint: 'https://x/health', ok: false, statusCode: 503, latencyMs: 80, body: { status: 'unhealthy' }, checkedAt: 'x' },
@@ -45,6 +46,8 @@ describe('summarizeRun', () => {
     expect(s.state).toBe('incident');
     expect(s.controlCenterUrl).toBe('http://localhost:3000/run?id=run_1');
     expect(s.deployments[0]?.endpoint).toBe('https://x');
+    expect(s.deployments[0]?.service).toBe('code-engine');
+    expect(s.targets[0]?.architectureRationale).toContain('always-on');
     expect(s.health[0]?.statusCode).toBe(503);
     expect(s.health[0]?.body).toEqual({ status: 'unhealthy' });
     expect(s.pendingApprovals).toHaveLength(1);

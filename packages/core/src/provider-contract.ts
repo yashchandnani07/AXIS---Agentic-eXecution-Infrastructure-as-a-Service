@@ -9,7 +9,7 @@
  *             human-readable message on failure. HTTP health verification is provider-independent (see probe.ts).
  */
 import type { EventType } from './events';
-import type { EventKind, Evidence, ProviderId, Resource, TargetPlan } from './schemas';
+import type { EventKind, Evidence, ProviderId, Resource, ServiceId, TargetPlan } from './schemas';
 
 export interface ProgressEvent {
   type: EventType;
@@ -36,6 +36,8 @@ export interface DeployResult {
 
 export interface DeploymentRef {
   provider: ProviderId;
+  /** which of the two real architectures on this cloud is live (see SERVICE_CATALOG) — adapters branch on this */
+  service: ServiceId;
   appName: string;
   region: string;
   endpoint?: string;
@@ -48,7 +50,10 @@ export interface ProviderCapabilities {
   authenticated: boolean;
   account?: string;
   region: string;
+  /** underlying primitives this adapter uses, e.g. ['code-engine', 'container-registry'] — free-form, for display */
   services: string[];
+  /** the real, deployable architecture choices on this cloud (see SERVICE_CATALOG) — what the UI/Bob can actually pick */
+  offeredServices: ServiceId[];
   supportsRollback: boolean;
   notes: string[];
 }

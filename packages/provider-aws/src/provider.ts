@@ -2,13 +2,20 @@
  * @file      packages/provider-aws/src/provider.ts
  * @phase     P7
  * @owner     Orchestration & Cloud
- * @purpose   AWS Lambda implementation of the CloudProvider contract (V1 second cloud).
- *            deploy = esbuild bundle → create/update function → publish version → alias "live" → public Function URL.
- *            setEnv = new config → new version → alias; rollback = alias → previous version; logs = CloudWatch.
+ * @purpose   AWS Lambda implementation of the CloudProvider contract (V1 second cloud). This ONE class serves BOTH real
+ *            AWS architectures in SERVICE_CATALOG — 'lambda' (on-demand) and 'lambda-provisioned' (provisioned
+ *            concurrency, no cold starts) — branching on target.service / ref.service. Adding a variant never means a
+ *            new class or new credentials, only a new branch in applyProvisionedConcurrencyIfNeeded().
+ *            deploy = esbuild bundle → create/update function → publish version → alias "live" → public Function URL
+ *            (+ provisioned concurrency on that version if the service calls for it).
+ *            setEnv/rollback = new/target version → alias → provisioned concurrency moved to the new version, removed
+ *            from the old one. logs = CloudWatch.
  * @depends   @aws-sdk/client-lambda, @aws-sdk/client-cloudwatch-logs, @aws-sdk/client-sts, @bobops/core, ./bundle, ./versions
  * @usedBy    apps/orchestrator/src/providers/registry.ts, scripts/smoke/deploy-aws.ts
  * @agentNotes Credentials come from the default AWS SDK chain (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in .env).
  *             A public Function URL needs TWO permissions (InvokeFunctionUrl + InvokeFunction via URL) — keep both.
+ *             Provisioned concurrency is per-VERSION, not per-alias, so it must be reapplied to every new version and
+ *             removed from the one being replaced — see applyProvisionedConcurrencyIfNeeded/removeProvisionedConcurrency.
  */
 import path from 'node:path';
 import {
@@ -16,12 +23,15 @@ import {
   CreateAliasCommand,
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
+  DeleteProvisionedConcurrencyConfigCommand,
   GetAliasCommand,
   GetFunctionConfigurationCommand,
   GetFunctionUrlConfigCommand,
+  GetProvisionedConcurrencyConfigCommand,
   LambdaClient,
   ListVersionsByFunctionCommand,
   PublishVersionCommand,
+  PutProvisionedConcurrencyConfigCommand,
   UpdateAliasCommand,
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
@@ -43,6 +53,7 @@ import {
   type ProviderCapabilities,
   type ProviderStatus,
   type Resource,
+  type ServiceId,
   type TargetPlan,
 } from '@bobops/core';
 import { bundleLambda } from './bundle';
@@ -54,10 +65,13 @@ export interface AwsConfig {
 }
 
 export const LAMBDA_ALIAS = 'live';
+/** Kept at 1 for the demo: it is the smallest amount that eliminates cold starts, at minimum cost. */
+const PROVISIONED_CONCURRENCY = 1;
 
 const errorName = (err: unknown) => (err as { name?: string } | null)?.name;
 const isNotFound = (err: unknown) => errorName(err) === 'ResourceNotFoundException';
 const isConflict = (err: unknown) => errorName(err) === 'ResourceConflictException';
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class AwsLambdaProvider implements CloudProvider {
   readonly id = 'aws' as const;
@@ -79,6 +93,7 @@ export class AwsLambdaProvider implements CloudProvider {
       displayName: 'AWS Lambda + Function URL',
       region: this.cfg.region,
       services: ['lambda', 'lambda-function-url', 'cloudwatch-logs'],
+      offeredServices: ['lambda', 'lambda-provisioned'] as ServiceId[],
       supportsRollback: true,
     };
     let value: ProviderCapabilities;
@@ -101,7 +116,37 @@ export class AwsLambdaProvider implements CloudProvider {
       { type: 'lambda-alias', name: LAMBDA_ALIAS, action: 'create' },
       { type: 'lambda-function-url', name: `${target.appName}:${LAMBDA_ALIAS}`, action: 'create' },
       { type: 'cloudwatch-log-group', name: `/aws/lambda/${target.appName}`, action: 'create' },
+      ...(target.service === 'lambda-provisioned'
+        ? [{ type: `lambda-provisioned-concurrency (${PROVISIONED_CONCURRENCY})`, name: `${target.appName}:<n>`, action: 'create' as const }]
+        : []),
     ];
+  }
+
+  /** Applies (or, for on-demand, does nothing) provisioned concurrency to a specific published version and waits until
+   * it is ready to serve traffic, so the alias is never pointed at a version whose warm capacity isn't up yet. */
+  private async applyProvisionedConcurrencyIfNeeded(name: string, version: string, service: ServiceId, progress: ProgressFn): Promise<void> {
+    if (service !== 'lambda-provisioned') return;
+    progress({ type: 'provider.progress', message: `Configuring provisioned concurrency (${PROVISIONED_CONCURRENCY}) on ${name}:${version} to eliminate cold starts` });
+    await this.lambda.send(
+      new PutProvisionedConcurrencyConfigCommand({ FunctionName: name, Qualifier: version, ProvisionedConcurrentExecutions: PROVISIONED_CONCURRENCY }),
+    );
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const status = await this.lambda.send(new GetProvisionedConcurrencyConfigCommand({ FunctionName: name, Qualifier: version }));
+      if (status.Status === 'READY') return;
+      if (status.Status === 'FAILED') throw new Error(`Provisioned concurrency failed on ${name}:${version}: ${status.StatusReason ?? 'unknown reason'}`);
+      await sleep(5000);
+    }
+    throw new Error(`Provisioned concurrency on ${name}:${version} did not become READY in time`);
+  }
+
+  /** Removes provisioned concurrency from a version this deployment is moving away from, so it stops being billed. */
+  private async removeProvisionedConcurrency(name: string, version: string | undefined): Promise<void> {
+    if (!version) return;
+    try {
+      await this.lambda.send(new DeleteProvisionedConcurrencyConfigCommand({ FunctionName: name, Qualifier: version }));
+    } catch (err) {
+      if (!isNotFound(err)) throw err;
+    }
   }
 
   private async functionExists(name: string): Promise<boolean> {
@@ -201,8 +246,9 @@ export class AwsLambdaProvider implements CloudProvider {
     }
 
     const version = await this.publishAndPoint(name, `BobOps run ${input.runId}`);
+    await this.applyProvisionedConcurrencyIfNeeded(name, version, target.service, progress);
     const endpoint = await this.ensureFunctionUrl(name, progress);
-    progress({ type: 'provision.completed', message: `Alias ${LAMBDA_ALIAS} → version ${version}` });
+    progress({ type: 'provision.completed', message: `Alias ${LAMBDA_ALIAS} → version ${version} (${target.service})` });
     return {
       endpoint,
       revision: version,
@@ -211,6 +257,7 @@ export class AwsLambdaProvider implements CloudProvider {
           functionName: name,
           version,
           alias: LAMBDA_ALIAS,
+          service: target.service,
           url: endpoint,
           runtime: 'nodejs22.x',
           region: this.cfg.region,
@@ -254,6 +301,7 @@ export class AwsLambdaProvider implements CloudProvider {
 
   async setEnv(ref: DeploymentRef, change: EnvChange, progress: ProgressFn): Promise<DeployResult> {
     const name = ref.appName;
+    const previousAlias = await this.lambda.send(new GetAliasCommand({ FunctionName: name, Name: LAMBDA_ALIAS })).catch(() => undefined);
     const current = await this.lambda.send(new GetFunctionConfigurationCommand({ FunctionName: name, Qualifier: LAMBDA_ALIAS }));
     const variables: Record<string, string> = { ...(current.Environment?.Variables ?? {}), ...(change.set ?? {}) };
     for (const key of change.remove ?? []) delete variables[key];
@@ -261,10 +309,13 @@ export class AwsLambdaProvider implements CloudProvider {
     await this.lambda.send(new UpdateFunctionConfigurationCommand({ FunctionName: name, Environment: { Variables: variables } }));
     await this.waitUpdated(name);
     const version = await this.publishAndPoint(name, `BobOps config change: ${describeEnvChange(change)}`);
+    // Provisioned concurrency is per-version: move it to the new version and stop paying for it on the old one.
+    await this.applyProvisionedConcurrencyIfNeeded(name, version, ref.service, progress);
+    await this.removeProvisionedConcurrency(name, previousAlias?.FunctionVersion);
     return {
       endpoint: (await this.getUrl(name)) ?? ref.endpoint ?? '',
       revision: version,
-      evidence: [evidence('Lambda configuration change', 'AWS Lambda API', { functionName: name, version, change: describeEnvChange(change) })],
+      evidence: [evidence('Lambda configuration change', 'AWS Lambda API', { functionName: name, version, service: ref.service, change: describeEnvChange(change) })],
     };
   }
 
@@ -281,11 +332,15 @@ export class AwsLambdaProvider implements CloudProvider {
     const target = toRevision ?? pickPreviousVersion(versions, alias.FunctionVersion ?? '');
     if (!target) throw new Error(`No published version earlier than ${alias.FunctionVersion} exists for ${name}`);
     progress({ type: 'provider.progress', message: `Moving alias ${LAMBDA_ALIAS} of ${name} from version ${alias.FunctionVersion} to ${target}` });
+    // Provisioned concurrency is per-version: bring the rolled-back-to version up before the alias moves to it, then
+    // stop paying for warm capacity on the version being rolled back away from.
+    await this.applyProvisionedConcurrencyIfNeeded(name, target, ref.service, progress);
     await this.pointAlias(name, target);
+    await this.removeProvisionedConcurrency(name, alias.FunctionVersion);
     return {
       endpoint: (await this.getUrl(name)) ?? ref.endpoint ?? '',
       revision: target,
-      evidence: [evidence('Lambda rollback', 'AWS Lambda API', { functionName: name, from: alias.FunctionVersion, to: target })],
+      evidence: [evidence('Lambda rollback', 'AWS Lambda API', { functionName: name, from: alias.FunctionVersion, to: target, service: ref.service })],
     };
   }
 }

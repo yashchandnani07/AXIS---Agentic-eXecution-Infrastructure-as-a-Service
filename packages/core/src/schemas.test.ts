@@ -10,7 +10,14 @@
 import { describe, expect, it } from 'vitest';
 import { stageForEvent } from './events';
 import { EXAMPLE_APP_PROFILE, examplePlan } from './fixtures';
-import { AppProfileSchema, DeploymentPlanSchema, DiagnosisSchema, RemediationActionSchema, TargetPlanSchema } from './schemas';
+import {
+  AppProfileSchema,
+  DeploymentPlanSchema,
+  DiagnosisSchema,
+  RemediationActionSchema,
+  TargetPlanSchema,
+  servicesForProvider,
+} from './schemas';
 
 const target = examplePlan(['ibm-cloud']).targets[0]!;
 
@@ -28,6 +35,21 @@ describe('schemas', () => {
   });
   it('enforces provider/service pairing', () => {
     expect(TargetPlanSchema.safeParse({ ...target, service: 'lambda' }).success).toBe(false);
+  });
+  it('offers two real, deployable architectures per cloud', () => {
+    expect(servicesForProvider('ibm-cloud').map((s) => s.service)).toEqual(['code-engine', 'code-engine-scale-to-zero']);
+    expect(servicesForProvider('aws').map((s) => s.service)).toEqual(['lambda', 'lambda-provisioned']);
+  });
+  it('accepts the cost-optimized/scale-to-zero variant of a target as a genuinely different valid plan', () => {
+    const alt = examplePlan(['ibm-cloud'], { 'ibm-cloud': 'code-engine-scale-to-zero' }).targets[0]!;
+    expect(TargetPlanSchema.parse(alt).service).toBe('code-engine-scale-to-zero');
+    expect(alt.architectureRationale).not.toBe(target.architectureRationale);
+  });
+  it('requires a real architecture rationale, not a token label', () => {
+    expect(TargetPlanSchema.safeParse({ ...target, architectureRationale: 'because' }).success).toBe(false);
+  });
+  it('refuses a plan with two targets for the same provider', () => {
+    expect(DeploymentPlanSchema.safeParse({ ...examplePlan(['ibm-cloud']), targets: [target, target] }).success).toBe(false);
   });
   it('requires two evidence items in a diagnosis', () => {
     expect(DiagnosisSchema.safeParse({ summary: 's', rootCause: 'r', confidence: 'high', evidence: ['one'] }).success).toBe(false);

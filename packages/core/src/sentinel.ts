@@ -14,14 +14,37 @@ import { HealthCheckSchema, ProviderIdSchema, type HealthCheck } from './schemas
 export const SENTINEL_LABEL = 'sentinel-incident';
 const MARKER = '<!-- bobops-incident:v1 -->';
 
+/** GitHub Actions cannot run a schedule faster than every 5 minutes, so the workflow cron is fixed at that floor.
+ * A user-chosen check-in cadence slower than 5 min is honored by shouldProbeNow() sampling every Nth tick — see below. */
+export const SENTINEL_CRON_MINUTES = 5;
+
 export const SentinelTargetSchema = z.object({
   runId: z.string(),
   provider: ProviderIdSchema,
   appName: z.string(),
   endpoint: z.string().url(),
   healthPath: z.string().default('/health'),
+  /** How often the user wants this deployment checked, in minutes. Must be a multiple of SENTINEL_CRON_MINUTES;
+   * the cron itself still fires every 5 min, but shouldProbeNow() skips ticks until this many minutes have passed. */
+  intervalMinutes: z
+    .number()
+    .int()
+    .min(SENTINEL_CRON_MINUTES)
+    .max(1440)
+    .default(SENTINEL_CRON_MINUTES)
+    .refine((n) => n % SENTINEL_CRON_MINUTES === 0, `intervalMinutes must be a multiple of ${SENTINEL_CRON_MINUTES}`),
 });
 export type SentinelTarget = z.infer<typeof SentinelTargetSchema>;
+
+/**
+ * Stateless sampling: the workflow's cron always fires every SENTINEL_CRON_MINUTES, but a target with a slower
+ * user-chosen interval is only actually probed on the ticks that land on a multiple of its interval. No external
+ * state needed — every runner agrees on the same wall-clock tick.
+ */
+export function shouldProbeNow(target: Pick<SentinelTarget, 'intervalMinutes'>, now: Date = new Date()): boolean {
+  const tick = Math.floor(now.getTime() / 60_000 / SENTINEL_CRON_MINUTES) * SENTINEL_CRON_MINUTES;
+  return tick % target.intervalMinutes === 0;
+}
 
 export const SentinelIncidentPayloadSchema = z.object({
   version: z.literal(1),

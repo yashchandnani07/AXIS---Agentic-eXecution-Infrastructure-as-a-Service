@@ -9,7 +9,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { HealthCheck } from './schemas';
-import { consecutiveFailures, parseIssueBody, renderIssueBody, type SentinelIncidentPayload } from './sentinel';
+import {
+  SentinelTargetSchema,
+  consecutiveFailures,
+  parseIssueBody,
+  renderIssueBody,
+  shouldProbeNow,
+  type SentinelIncidentPayload,
+} from './sentinel';
 
 const probe = (ok: boolean): HealthCheck => ({
   id: crypto.randomUUID(),
@@ -47,5 +54,22 @@ describe('sentinel format', () => {
 
   it('ignores unrelated issue bodies', () => {
     expect(parseIssueBody('just a normal issue')).toBeNull();
+  });
+
+  it('rejects an interval that is not a multiple of the 5-minute cron floor', () => {
+    const base = { runId: 'r', provider: 'aws' as const, appName: 'bobops-x', endpoint: 'https://x.example.com' };
+    expect(SentinelTargetSchema.safeParse({ ...base, intervalMinutes: 7 }).success).toBe(false);
+    expect(SentinelTargetSchema.safeParse({ ...base, intervalMinutes: 15 }).success).toBe(true);
+  });
+
+  it('samples a user-chosen interval on a fixed 5-minute cron without any external state', () => {
+    const every5 = { intervalMinutes: 5 };
+    const every15 = { intervalMinutes: 15 };
+    expect(shouldProbeNow(every5, new Date('2026-09-27T10:00:00Z'))).toBe(true);
+    expect(shouldProbeNow(every5, new Date('2026-09-27T10:05:00Z'))).toBe(true);
+    expect(shouldProbeNow(every15, new Date('2026-09-27T10:00:00Z'))).toBe(true);
+    expect(shouldProbeNow(every15, new Date('2026-09-27T10:05:00Z'))).toBe(false);
+    expect(shouldProbeNow(every15, new Date('2026-09-27T10:10:00Z'))).toBe(false);
+    expect(shouldProbeNow(every15, new Date('2026-09-27T10:15:00Z'))).toBe(true);
   });
 });

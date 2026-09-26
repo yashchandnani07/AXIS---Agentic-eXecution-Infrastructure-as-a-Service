@@ -15,6 +15,67 @@ import { isSecretKey } from './redact';
 export const ProviderIdSchema = z.enum(['ibm-cloud', 'aws']);
 export type ProviderId = z.infer<typeof ProviderIdSchema>;
 
+/**
+ * Every deployable service, across both clouds. Each cloud offers two real architectures on the same cost/latency axis:
+ * an always-warm option (no cold starts, higher idle cost) and a cost-optimized option (scales down when idle, possible
+ * cold start). This is a genuine trade-off the cloud-architect specialist evaluates per app, not a cosmetic label —
+ * see SERVICE_CATALOG below and .bob/rules-multicloud-devops/04-specialists-and-synthesis.md.
+ */
+export const ServiceIdSchema = z.enum(['code-engine', 'code-engine-scale-to-zero', 'lambda', 'lambda-provisioned']);
+export type ServiceId = z.infer<typeof ServiceIdSchema>;
+
+export interface ServiceDescriptor {
+  service: ServiceId;
+  provider: ProviderId;
+  label: string;
+  /** 'warm' = always ready, no cold starts, higher idle cost. 'cost-optimized' = scales down when idle, cheaper, possible cold start. */
+  kind: 'warm' | 'cost-optimized';
+  description: string;
+}
+
+/** The real, deployable architecture choices per cloud. Both variants of a cloud share the SAME provider adapter class —
+ * the adapter branches on `target.service` — so adding a variant here never requires a new class or new credentials. */
+export const SERVICE_CATALOG: readonly ServiceDescriptor[] = [
+  {
+    service: 'code-engine',
+    provider: 'ibm-cloud',
+    label: 'Code Engine — always-on container',
+    kind: 'warm',
+    description: 'min-scale 1: at least one instance always running. Predictable latency, no cold starts, higher idle cost.',
+  },
+  {
+    service: 'code-engine-scale-to-zero',
+    provider: 'ibm-cloud',
+    label: 'Code Engine — scale-to-zero container',
+    kind: 'cost-optimized',
+    description: 'min-scale 0: scales to zero when idle. Lower cost for infrequent traffic; a cold start on the first request after idling.',
+  },
+  {
+    service: 'lambda',
+    provider: 'aws',
+    label: 'Lambda — on-demand',
+    kind: 'cost-optimized',
+    description: 'Pay per invocation only. Lower cost for infrequent or bursty traffic; possible cold starts.',
+  },
+  {
+    service: 'lambda-provisioned',
+    provider: 'aws',
+    label: 'Lambda — provisioned concurrency',
+    kind: 'warm',
+    description: 'Keeps warm instances ready. Eliminates cold starts, at the cost of paying for idle warm capacity.',
+  },
+] as const;
+
+export function servicesForProvider(provider: ProviderId): ServiceDescriptor[] {
+  return SERVICE_CATALOG.filter((s) => s.provider === provider);
+}
+
+export function describeService(service: ServiceId): ServiceDescriptor {
+  const found = SERVICE_CATALOG.find((s) => s.service === service);
+  if (!found) throw new Error(`Unknown service "${service}"`);
+  return found;
+}
+
 export const RunStateSchema = z.enum([
   'created',
   'analyzed',
@@ -99,7 +160,7 @@ export const APP_NAME_PATTERN = /^bobops-[a-z0-9-]{3,40}$/;
 export const TargetPlanSchema = z
   .object({
     provider: ProviderIdSchema,
-    service: z.enum(['code-engine', 'lambda']),
+    service: ServiceIdSchema,
     region: z.string().min(1),
     appName: z.string().regex(APP_NAME_PATTERN, 'appName must match ^bobops-[a-z0-9-]{3,40}$'),
     port: z.number().int().positive().default(8080),
@@ -109,24 +170,33 @@ export const TargetPlanSchema = z
     /** Names of secrets resolved by the orchestrator from SECRET_<NAME> and stored in the provider's secret mechanism. */
     secretRefs: z.array(z.string()).default([]),
     healthPath: z.string().startsWith('/').default('/health'),
+    /** Why THIS service was chosen for THIS cloud over the other real option in SERVICE_CATALOG. Must cite the app
+     * profile (traffic pattern, latency sensitivity, cost). This is a real decision, not a label — see rule 04. */
+    architectureRationale: z
+      .string()
+      .min(20, 'Explain why this service was chosen over the alternative for this cloud, citing the app profile'),
   })
-  .refine((t) => (t.provider === 'ibm-cloud') === (t.service === 'code-engine'), {
-    message: 'ibm-cloud targets use service "code-engine"; aws targets use service "lambda"',
+  .refine((t) => SERVICE_CATALOG.some((s) => s.provider === t.provider && s.service === t.service), {
+    message: 'service must be one of the real options offered for this provider — see servicesForProvider()',
   })
   .refine((t) => Object.keys(t.env).every((k) => !isSecretKey(k)), {
     message: 'Secret-looking keys (TOKEN/SECRET/PASSWORD/API_KEY/PRIVATE) must be listed in secretRefs, not env',
   });
 export type TargetPlan = z.infer<typeof TargetPlanSchema>;
 
-export const DeploymentPlanSchema = z.object({
-  summary: z.string().min(1),
-  targets: z.array(TargetPlanSchema).min(1),
-  risks: z.array(RiskSchema).default([]),
-  generatedAssets: z.array(z.object({ path: z.string(), purpose: z.string() })).default([]),
-  rollbackStrategy: z.string().min(1),
-  approvalGates: z.array(z.string()).min(1),
-  estimatedMonthlyCostUsd: z.number().nonnegative().optional(),
-});
+export const DeploymentPlanSchema = z
+  .object({
+    summary: z.string().min(1),
+    targets: z.array(TargetPlanSchema).min(1),
+    risks: z.array(RiskSchema).default([]),
+    generatedAssets: z.array(z.object({ path: z.string(), purpose: z.string() })).default([]),
+    rollbackStrategy: z.string().min(1),
+    approvalGates: z.array(z.string()).min(1),
+    estimatedMonthlyCostUsd: z.number().nonnegative().optional(),
+  })
+  .refine((p) => new Set(p.targets.map((t) => t.provider)).size === p.targets.length, {
+    message: 'A plan may have at most one target per provider (one architecture choice per cloud)',
+  });
 export type DeploymentPlan = z.infer<typeof DeploymentPlanSchema>;
 
 export const EvidenceSchema = z.object({
@@ -187,6 +257,8 @@ export const DeploymentSchema = z.object({
   id: z.string(),
   runId: z.string(),
   provider: ProviderIdSchema,
+  /** which of the two real architectures on this cloud is live — the adapter branches on this for status/logs/setEnv/rollback */
+  service: ServiceIdSchema,
   appName: z.string(),
   region: z.string(),
   healthPath: z.string(),
@@ -256,6 +328,9 @@ export const RunSchema = z.object({
   repoPath: z.string(),
   objective: z.string(),
   targets: z.array(ProviderIdSchema).min(1),
+  /** How often the user wants this deployment checked by the GitHub sentinel, in minutes (must be a multiple of 5 —
+   * GitHub Actions cannot schedule faster than that). Set at run creation; see SERVICE_CATALOG-adjacent sentinel.ts. */
+  sentinelIntervalMinutes: z.number().int().min(5).max(1440).default(5),
   state: RunStateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),

@@ -87,12 +87,19 @@ export function registerTools(server: McpServer, api: OrchestratorClient, uiBase
 
   define(
     'devops_create_run',
-    'ACTION (UNDERSTAND). Start a deployment run for a repository folder (path relative to the workspace root, e.g. apps/demo-service) and objective. Returns runId and the Control Center URL to share with the developer.',
+    'ACTION (UNDERSTAND). Start a deployment run for a repository folder (path relative to the workspace root, e.g. apps/demo-service) and objective. Ask the developer how often they want the GitHub sentinel to check on this deployment after it goes live (5, 15, 30 or 60 minutes are good choices — it must be a multiple of 5) and pass it as sentinelIntervalMinutes; default to 5 if they have no preference. Returns runId and the Control Center URL to share with the developer.',
     {
       projectName: z.string().describe('short project name, e.g. nimbus-books'),
       repoPath: z.string().describe('folder relative to the workspace root'),
       objective: z.string().describe("the developer's deployment goal in one sentence"),
       targets: z.array(ProviderIdSchema).min(1),
+      sentinelIntervalMinutes: z
+        .number()
+        .int()
+        .min(5)
+        .max(1440)
+        .default(5)
+        .describe('How often (in minutes, multiple of 5) the GitHub sentinel checks this deployment after it is live. Ask the developer; default 5.'),
     },
     async (args) => {
       const run = await api.post<{ id: string }>('/api/runs', args);

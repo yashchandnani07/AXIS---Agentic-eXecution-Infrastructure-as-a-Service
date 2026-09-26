@@ -23,9 +23,17 @@ export function summarizeRun(agg: RunAggregate, uiBase: string) {
     repoPath: agg.run.repoPath,
     controlCenterUrl: `${uiBase}/run?id=${agg.run.id}`,
     planHash: agg.run.planHash?.slice(0, 12),
-    targets: (agg.run.plan?.targets ?? []).map((t) => ({ provider: t.provider, service: t.service, appName: t.appName, region: t.region, env: t.env })),
+    targets: (agg.run.plan?.targets ?? []).map((t) => ({
+      provider: t.provider,
+      service: t.service,
+      architectureRationale: t.architectureRationale,
+      appName: t.appName,
+      region: t.region,
+      env: t.env,
+    })),
     deployments: [...latestDeploy.values()].map((d) => ({
       provider: d.provider,
+      service: d.service,
       status: d.status,
       endpoint: d.endpoint,
       revision: d.revision,

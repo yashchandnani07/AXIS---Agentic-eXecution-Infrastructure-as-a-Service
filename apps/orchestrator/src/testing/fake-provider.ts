@@ -7,19 +7,20 @@
  * @usedBy    lifecycle.test.ts
  * @agentNotes Health rule mirrors the real demo app: healthy iff CATALOG_MODE is set in the app's env.
  */
-import type {
-  CloudProvider,
-  DeployInput,
-  DeployResult,
-  DeploymentRef,
-  EnvChange,
-  ProbeFn,
-  ProgressFn,
-  ProviderCapabilities,
-  ProviderId,
-  ProviderStatus,
-  Resource,
-  TargetPlan,
+import {
+  servicesForProvider,
+  type CloudProvider,
+  type DeployInput,
+  type DeployResult,
+  type DeploymentRef,
+  type EnvChange,
+  type ProbeFn,
+  type ProgressFn,
+  type ProviderCapabilities,
+  type ProviderId,
+  type ProviderStatus,
+  type Resource,
+  type TargetPlan,
 } from '@bobops/core';
 
 export class FakeProvider implements CloudProvider {
@@ -46,6 +47,7 @@ export class FakeProvider implements CloudProvider {
       authenticated: true,
       region: 'fake-1',
       services: ['fake'],
+      offeredServices: servicesForProvider(this.id).map((s) => s.service),
       supportsRollback: true,
       notes: ['in-memory test double'],
     };

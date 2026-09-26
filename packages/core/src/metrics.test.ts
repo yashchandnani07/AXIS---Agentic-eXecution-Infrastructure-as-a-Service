@@ -19,6 +19,7 @@ const agg: RunAggregate = {
     repoPath: 'apps/demo-service',
     objective: 'deploy',
     targets: ['ibm-cloud'],
+    sentinelIntervalMinutes: 5,
     state: 'healthy',
     createdAt: '2026-09-27T10:00:00.000Z',
     updatedAt: '2026-09-27T10:10:00.000Z',

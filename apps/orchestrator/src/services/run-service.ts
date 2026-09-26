@@ -34,6 +34,8 @@ export interface CreateRunInput {
   repoPath: string;
   objective: string;
   targets: ProviderId[];
+  /** How often the user wants the GitHub sentinel to check on this deployment, in minutes (multiple of 5). */
+  sentinelIntervalMinutes?: number;
 }
 
 const maxSeverity = (plan: DeploymentPlan): Severity =>
@@ -66,6 +68,7 @@ export class RunService {
       repoPath: rel.split(path.sep).join('/'),
       objective: input.objective,
       targets: [...new Set(input.targets)],
+      sentinelIntervalMinutes: input.sentinelIntervalMinutes ?? 5,
       state: 'created',
       createdAt: now,
       updatedAt: now,
@@ -77,7 +80,7 @@ export class RunService {
       actor,
       kind: 'action',
       type: 'run.created',
-      message: `Run created for ${run.projectName} (${run.repoPath}): "${run.objective}" → ${run.targets.join(' + ')}`,
+      message: `Run created for ${run.projectName} (${run.repoPath}): "${run.objective}" → ${run.targets.join(' + ')} (sentinel check-in every ${run.sentinelIntervalMinutes} min)`,
     });
     return run;
   }

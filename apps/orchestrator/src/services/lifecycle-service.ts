@@ -101,7 +101,7 @@ export class LifecycleService {
   }
 
   private refFor(dep: Deployment): DeploymentRef {
-    return { provider: dep.provider, appName: dep.appName, region: dep.region, endpoint: dep.endpoint, revision: dep.revision };
+    return { provider: dep.provider, service: dep.service, appName: dep.appName, region: dep.region, endpoint: dep.endpoint, revision: dep.revision };
   }
 
   /** Latest SUCCESSFUL deployment per provider for a run. */
@@ -221,6 +221,7 @@ export class LifecycleService {
       id: newId('dep'),
       runId,
       provider: target.provider,
+      service: target.service,
       appName: target.appName,
       region: target.region,
       healthPath: target.healthPath,
@@ -314,18 +315,25 @@ export class LifecycleService {
 
   private async armSentinel(runId: string): Promise<void> {
     if (!this.d.github) return;
+    const run = this.d.store.getRun(runId);
     const targets = this.latestDeployments(runId).map((d) => ({
       runId,
       provider: d.provider,
       appName: d.appName,
       endpoint: d.endpoint ?? '',
       healthPath: d.healthPath,
+      intervalMinutes: run.sentinelIntervalMinutes,
     }));
     try {
       await this.d.github.publishSentinelTargets(targets);
-      this.emit(runId, 'orchestrator', 'action', 'sentinel.armed', `GitHub health sentinel armed for ${targets.length} endpoint(s)`, [
-        evidence('Sentinel targets (repo variable SENTINEL_TARGETS)', 'GitHub Actions', targets),
-      ]);
+      this.emit(
+        runId,
+        'orchestrator',
+        'action',
+        'sentinel.armed',
+        `GitHub health sentinel armed for ${targets.length} endpoint(s), checking in every ${run.sentinelIntervalMinutes} min`,
+        [evidence('Sentinel targets (repo variable SENTINEL_TARGETS)', 'GitHub Actions', targets)],
+      );
     } catch (err) {
       this.emit(runId, 'orchestrator', 'observation', 'orchestrator.warning', `Could not arm the GitHub sentinel: ${errMsg(err)}`);
     }
@@ -605,6 +613,7 @@ export class LifecycleService {
             authenticated: false,
             region: 'unknown',
             services: [],
+            offeredServices: [],
             supportsRollback: false,
             notes: [errMsg(err)],
           }),

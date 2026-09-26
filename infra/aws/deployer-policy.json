@@ -18,7 +18,10 @@
         "lambda:GetFunctionUrlConfig",
         "lambda:CreateFunctionUrlConfig",
         "lambda:AddPermission",
-        "lambda:GetPolicy"
+        "lambda:GetPolicy",
+        "lambda:PutProvisionedConcurrencyConfig",
+        "lambda:GetProvisionedConcurrencyConfig",
+        "lambda:DeleteProvisionedConcurrencyConfig"
       ],
       "Resource": [
         "arn:aws:lambda:*:*:function:bobops-*",

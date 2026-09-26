@@ -24,6 +24,16 @@ const CreateRunBody = z.object({
   repoPath: z.string().min(1),
   objective: z.string().min(1),
   targets: z.array(ProviderIdSchema).min(1),
+  /** How often the user wants the GitHub sentinel to check on this deployment, in minutes. GitHub Actions cannot
+   * schedule faster than every 5 minutes, so this must be a multiple of 5 (5, 10, 15, 30, 60, ...). */
+  sentinelIntervalMinutes: z
+    .number()
+    .int()
+    .min(5)
+    .max(1440)
+    .refine((n) => n % 5 === 0, 'sentinelIntervalMinutes must be a multiple of 5')
+    .default(5)
+    .optional(),
 });
 
 const NoteBody = z.object({
