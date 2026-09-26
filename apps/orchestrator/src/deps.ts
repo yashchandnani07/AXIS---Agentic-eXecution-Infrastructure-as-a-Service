@@ -10,6 +10,7 @@
 import { probeHealth, type CloudProvider, type ProbeFn, type ProviderId } from '@bobops/core';
 import type { Config } from './config';
 import { EventBus } from './events/event-bus';
+import { createGitHubPort } from './github';
 import type { GitHubPort } from './ports';
 import { buildProviders } from './providers/registry';
 import { LifecycleService } from './services/lifecycle-service';
@@ -24,6 +25,7 @@ export interface Deps {
   runs: RunService;
   lifecycle: LifecycleService;
   providers: Map<ProviderId, CloudProvider>;
+  github: GitHubPort | null;
 }
 
 export interface DepOverrides {
@@ -39,6 +41,7 @@ export function createDeps(config: Config, o: DepOverrides = {}): Deps {
   const bus = new EventBus(store);
   const runs = new RunService(store, bus, config.repoRoot);
   const providers = o.providers ?? buildProviders(config);
+  const github = o.github !== undefined ? o.github : createGitHubPort(config);
   const lifecycle = new LifecycleService({
     store,
     bus,
@@ -48,9 +51,9 @@ export function createDeps(config: Config, o: DepOverrides = {}): Deps {
     runTests: o.runTests ?? runPackageTests,
     repoRoot: config.repoRoot,
     resolveSecret: (name) => config.secrets[name],
-    github: o.github ?? null,
+    github,
     retryDelayMs: o.retryDelayMs ?? 5000,
     demoMode: config.demoMode,
   });
-  return { config, store, bus, runs, lifecycle, providers };
+  return { config, store, bus, runs, lifecycle, providers, github };
 }

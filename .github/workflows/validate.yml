@@ -1,0 +1,29 @@
+# @file      .github/workflows/validate.yml
+# @phase     P12
+# @owner     Product & Experience
+# @purpose   CI validation on every push/PR: install, typecheck, unit tests (incl. the full fake-cloud lifecycle), builds.
+# @agentNotes Must stay green — judges look at the Actions tab.
+name: validate
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter @bobops/demo-service build
+      - run: pnpm build:mcp
+      - run: pnpm --filter @bobops/control-center build

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@bobops/core": "workspace:*",
+    "@bobops/github": "workspace:*",
     "@bobops/provider-aws": "workspace:*",
     "@bobops/provider-ibm-cloud": "workspace:*",
     "@hono/node-server": "^1.13.7",

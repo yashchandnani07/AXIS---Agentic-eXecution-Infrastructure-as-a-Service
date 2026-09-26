@@ -1,0 +1,49 @@
+# @file      .github/workflows/deploy.yml
+# @phase     P12 (COULD)
+# @owner     Product & Experience
+# @purpose   Approval-gated CI deployment of the demo app to one provider. The "production" GitHub Environment must have
+#            Required reviewers configured → a second, GitHub-native human approval gate.
+# @agentNotes Requires the generated assets (Dockerfile, src/lambda.ts) to be committed, plus repo secrets
+#             IBMCLOUD_API_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SECRET_ADMIN_TOKEN and variable AWS_LAMBDA_ROLE_ARN.
+name: deploy
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Target cloud
+        type: choice
+        options: [ibm-cloud, aws]
+        required: true
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install IBM Cloud CLI + Code Engine plugin
+        if: inputs.provider == 'ibm-cloud'
+        run: |
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+          ibmcloud plugin install code-engine -f
+      - name: Deploy and verify
+        env:
+          DEPLOY_PROVIDER: ${{ inputs.provider }}
+          IBMCLOUD_API_KEY: ${{ secrets.IBMCLOUD_API_KEY }}
+          IBMCLOUD_REGION: us-south
+          IBMCLOUD_RESOURCE_GROUP: Default
+          IBM_CE_PROJECT: bobops-demo
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: us-east-1
+          AWS_LAMBDA_ROLE_ARN: ${{ vars.AWS_LAMBDA_ROLE_ARN }}
+          SECRET_ADMIN_TOKEN: ${{ secrets.SECRET_ADMIN_TOKEN }}
+        run: pnpm --filter @bobops/scripts run deploy:ci

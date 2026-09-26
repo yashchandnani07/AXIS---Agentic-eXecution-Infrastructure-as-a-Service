@@ -19,5 +19,21 @@ const config = loadConfig();
 const deps = createDeps(config);
 
 serve({ fetch: createApp(deps).fetch, port: config.ORCHESTRATOR_PORT }, (info) => {
-  console.log(`BobOps orchestrator listening on http://localhost:${info.port} (demo mode: ${config.demoMode})`);
+  console.log(`AXIS orchestrator listening on http://localhost:${info.port} (demo mode: ${config.demoMode})`);
+  console.log(
+    deps.github
+      ? `GitHub sentinel sync: ON (${config.GITHUB_OWNER}/${config.GITHUB_REPO}, every 60 s)`
+      : 'GitHub sentinel sync: OFF (set GITHUB_* in .env)',
+  );
 });
+
+if (deps.github) {
+  setInterval(() => {
+    deps.lifecycle
+      .syncIncidents()
+      .then((r) => {
+        if (r.imported) console.log(`[sentinel-sync] imported ${r.imported} incident(s)`);
+      })
+      .catch((err: unknown) => console.error('[sentinel-sync]', err instanceof Error ? err.message : err));
+  }, 60_000);
+}

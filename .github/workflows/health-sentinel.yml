@@ -1,0 +1,53 @@
+# @file      .github/workflows/health-sentinel.yml
+# @phase     P12
+# @owner     Product & Experience
+# @purpose   Independent cross-cloud health sentinel. This cron is GitHub's FASTEST possible schedule (every 5 min) —
+#            it is a floor, not the user's chosen cadence. Each run's actual check-in interval (5/15/30/60 min, chosen
+#            by the user when Bob created the run) is honored by run-sentinel.ts's shouldProbeNow(), which skips a
+#            target's probe on ticks that don't land on its interval. Opens GitHub issues with JSON evidence after 3
+#            consecutive failures on a tick where the target WAS due; the orchestrator imports them as incidents.
+# @agentNotes Scheduled runs can be delayed by GitHub — that's why the demo uses workflow_dispatch and why this is NOT the
+#             only health mechanism (orchestrator verify + provider-native status are first line). Disable after the event:
+#             gh workflow disable health-sentinel.yml
+name: health-sentinel
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      attempts:
+        description: Probe attempts per target (incident threshold = attempts)
+        required: false
+        default: '3'
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: health-sentinel
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Probe every deployed endpoint
+        env:
+          SENTINEL_TARGETS: ${{ vars.SENTINEL_TARGETS }}
+          SENTINEL_ATTEMPTS: ${{ inputs.attempts || '3' }}
+          SENTINEL_REPORT_PATH: ${{ github.workspace }}/sentinel-report.json
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: pnpm sentinel
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sentinel-report-${{ github.run_id }}
+          path: sentinel-report.json
+          if-no-files-found: ignore
