@@ -1,493 +1,747 @@
-<div align="center">
+# AXIS — Agentic eXecution Infrastructure as a Service
 
-# 🛰️ AXIS
-### **Agentic eXecution Infrastructure as a Service**
-**Autonomous Multi-Cloud DevOps, Cryptographic Governance & Self-Healing Platform**
-
-*Powered by **IBM Bob 2.0** & **IBM watsonx.ai** (IBM Granite 3-8B)*
+> **IBM Bob 2.0 Hackathon Submission · September 25–27, 2026**
+> *"Bob is the DevOps engineer, you are the approver, and the orchestrator is the enforcement layer."*
 
 ---
 
-[![CI Validation](https://github.com/yashchandnani07/AXIS---Agentic-eXecution-Infrastructure-as-a-Service/actions/workflows/validate.yml/badge.svg)](https://github.com/yashchandnani07/AXIS---Agentic-eXecution-Infrastructure-as-a-Service/actions/workflows/validate.yml)
-[![Health Sentinel](https://github.com/yashchandnani07/AXIS---Agentic-eXecution-Infrastructure-as-a-Service/actions/workflows/health-sentinel.yml/badge.svg)](https://github.com/yashchandnani07/AXIS---Agentic-eXecution-Infrastructure-as-a-Service/actions/workflows/health-sentinel.yml)
-[![Tests Passing](https://img.shields.io/badge/tests-55%2F55%20passed-22c55e?style=flat-square&logo=vitest)](https://github.com/yashchandnani07/AXIS---Agentic-eXecution-Infrastructure-as-a-Service)
-[![TypeScript](https://img.shields.io/badge/typescript-5.8%20strict-3178c6?style=flat-square&logo=typescript)](https://github.com/yashchandnani07/AXIS---Agentic-eXecution-Infrastructure-as-a-Service)
-[![Hackathon](https://img.shields.io/badge/IBM%20Bob%202.0-Hackathon%20Submission-be95ff?style=flat-square)](https://lablab.ai/event/ibm-bob-hackathon)
+## System Architecture
 
-<br/>
-
-> **"Bob is the DevOps engineer. You are the approver. The orchestrator is the cryptographic enforcement layer."**
-
-<br/>
-
-[**🌐 Live AWS Lambda Endpoint**](https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health) • [**⚡ Quickstart Setup**](#-quickstart--zero-friction-onboarding) • [**🤖 Watson AI Integration**](#-ibm-watsonxai--granite-deep-integration) • [**📊 Architecture Specifications**](#-system-architecture--deep-pipeline) • [**🎬 Demo Runbook**](docs/demo/demo-script.md)
-
-</div>
-
----
-
-## 🏛️ Comprehensive Architecture & Execution Topology
-
-```mermaid
-flowchart TD
-  classDef ide fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
-  classDef mcp fill:#18181b,stroke:#a855f7,stroke-width:2px,color:#f8fafc;
-  classDef orch fill:#09090b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
-  classDef cloud fill:#0f172a,stroke:#06b6d4,stroke-width:2px,color:#f8fafc;
-  classDef ui fill:#111827,stroke:#10b981,stroke-width:2px,color:#f8fafc;
-  classDef alert fill:#311010,stroke:#ef4444,stroke-width:2px,color:#f8fafc;
-
-  subgraph S_DEVELOPER ["1. DEVELOPER WORKSPACE"]
-    DEV["👨‍💻 DevOps / Engineer"]
-    PROMPT["Goal: /deploy apps/demo-service<br/>Deploy Nimbus Books to IBM Cloud & AWS with verified health"]
-    DEV -->|types goal| PROMPT
-  end
-
-  subgraph S_BOB ["2. IBM BOB 2.0 AGENTIC ENVIRONMENT"]
-    MODE["🛰️ Custom Mode: Multi-Cloud DevOps Engineer<br/>6 Rules · 2 Skills · 3 Commands · Evidence Standard"]
-    
-    subgraph S_SUBAGENTS ["4 Parallel Specialist Subagents"]
-      SUB_ANALYST["🔍 App Analyst<br/>Inspects runtime & dependencies"]
-      SUB_ARCH["🏛️ Cloud Architect<br/>Selects optimal architectures"]
-      SUB_SEC["🔒 Security Reviewer<br/>Enforces zero-secret policies"]
-      SUB_VERIF["🧪 Release Verifier<br/>Validates pre/post gates"]
-    end
-    
-    ASSETS["Generated Deployment Assets<br/>Dockerfile · lambda.ts · .ceignore"]
-    
-    PROMPT --> MODE
-    MODE --> S_SUBAGENTS
-    S_SUBAGENTS -->|synthesize| ASSETS
-  end
-
-  subgraph S_MCP ["3. CUSTOM MCP PROTOCOL BRIDGE (apps/bob-mcp)"]
-    MCP_SERVER["apps/bob-mcp (stdio JSON-RPC)<br/>17 Lifecycle Tools · Strict Prompts"]
-    MCP_NO_APPROVE["🚫 DELIBERATELY NO APPROVE TOOL<br/>Agent can propose but CANNOT self-approve"]
-    MCP_SERVER -.-> MCP_NO_APPROVE
-  end
-
-  MODE -->|tool invocations| MCP_SERVER
-
-  subgraph S_ORCH ["4. AXIS ORCHESTRATOR CORE (apps/orchestrator :4000)"]
-    STATE_MACHINE["State Machine Engine<br/>created → analyzed → awaiting_approval → deploying → healthy"]
-    GUARD["🔒 Cryptographic Approval Guard<br/>Binds approval to SHA-256 plan hash"]
-    BLOCKED["403 guard.blocked<br/>Refuses execution if plan tampered"]
-    STORE["Evidence & Audit Store<br/>Immutable events (5-label taxonomy)"]
-    SSE["SSE Event Bus<br/>Live streaming to UI"]
-    
-    GUARD --> BLOCKED
-    STATE_MACHINE --> GUARD
-    STATE_MACHINE --> STORE
-    STATE_MACHINE --> SSE
-  end
-
-  MCP_SERVER -->|HTTP REST Client| S_ORCH
-
-  subgraph S_CLOUDS ["5. MULTI-CLOUD EXECUTION TARGETS"]
-    subgraph S_IBM ["IBM Cloud Ecosystem (us-south)"]
-      IBM_CE["Code Engine Container<br/>Always-Warm (min:1) or Scale-to-Zero"]
-      IBM_DB["Cloudant NoSQL DB<br/>Persistent run state & telemetry"]
-      IBM_WML["watsonx.ai WML<br/>IBM Granite 3-8B Instruct LLM"]
-    end
-
-    subgraph S_AWS ["AWS Ecosystem (us-east-1)"]
-      AWS_LAMBDA["AWS Lambda Microservice<br/>Active Function URL · arm64 ESM"]
-      AWS_CW["CloudWatch Logs<br/>Runtime telemetry stream"]
-      AWS_VER["Versions & Aliases<br/>Instant atomic rollback"]
-    end
-  end
-
-  S_ORCH -->|CloudProvider Contract| S_IBM
-  S_ORCH -->|CloudProvider Contract| S_AWS
-
-  subgraph S_SENTINEL ["6. INDEPENDENT CROSS-CLOUD HEALTH SENTINEL"]
-    GHA_CRON["GitHub Actions Sentinel (health-sentinel.yml)<br/>Runs */5 cron or on-demand"]
-    PROBES["Tri-Probe Verification<br/>3 consecutive 503s on /health"]
-    GH_ISSUE["GitHub Issue with JSON Evidence<br/>Labels: sentinel-incident"]
-    
-    GHA_CRON -->|probes live endpoints| S_CLOUDS
-    GHA_CRON --> PROBES
-    PROBES -->|fault confirmed| GH_ISSUE
-  end
-
-  GH_ISSUE -->|60s periodic sync| S_ORCH
-
-  subgraph S_SELF_HEAL ["7. AUTONOMOUS SELF-HEALING & INCIDENT RESOLUTION"]
-    CMD_INVESTIGATE["/investigate Command<br/>Bob reads probe JSON + logs + code"]
-    DIAGNOSIS["Cited Root-Cause Diagnosis<br/>e.g. Missing CATALOG_MODE in config.ts:12"]
-    REMEDIATION["Safe Patch Proposal<br/>set_env CATALOG_MODE=featured"]
-    AUTO_CLOSE["GitHub Issue Auto-Closed<br/>Appends MTTR & recovery metrics"]
-
-    GH_ISSUE --> CMD_INVESTIGATE
-    CMD_INVESTIGATE --> DIAGNOSIS
-    DIAGNOSIS --> REMEDIATION
-    REMEDIATION -->|human approves| S_ORCH
-    S_ORCH --> AUTO_CLOSE
-  end
-
-  subgraph S_UI ["8. AXIS CONTROL CENTER WEB UI (apps/control-center :3000)"]
-    UI_STEPPER["Lifecycle Stepper<br/>Real-time visual pipeline"]
-    UI_FEED["Live Brain Feed<br/>Streaming specialist thoughts"]
-    UI_COST["💰 Interactive Cost Estimator<br/>Real formulas, SVG tiers, VM comparison"]
-    UI_WATSON["🤖 Watson Agent Copilot<br/>IBM Granite natural language chat"]
-    UI_APPROVE["One-Click Approval Button<br/>Transmits x-approval-token (Bob never sees)"]
-    
-    UI_APPROVE -->|authorizes exact hash| GUARD
-  end
-
-  SSE --> S_UI
-  IBM_WML <-->|Q&A / Telemetry| UI_WATSON
-
-  subgraph S_CHAOS ["9. CHAOS INJECTION & EMERGENCY ALERTING"]
-    COLLAPSE["⚡ Controlled Chaos Injection<br/>POST /api/demo/collapse"]
-    RESEND["📧 Resend Security Alert<br/>Executive HTML Incident Notification"]
-    COLLAPSE --> RESEND
-  end
-
-  S_UI -.->|triggers fault| S_CHAOS
-  S_CHAOS -.->|breaks env| S_CLOUDS
-
-  class S_BOB ide;
-  class S_MCP mcp;
-  class S_ORCH orch;
-  class S_CLOUDS,S_IBM,S_AWS cloud;
-  class S_UI ui;
-  class S_CHAOS,S_SENTINEL alert;
+```
++--------------------------------------------------------------------------------------------+
+|                                                                                            |
+|  DEVELOPER                                                                                 |
+|  types one sentence ---------------------------------------------------------------+       |
+|                                                                                    |       |
++----------------------+                                                             v       |
+|  IBM BOB IDE         |                                             +-----------------------+|
+|  +------------------+|                                             |  /deploy  /investigate ||
+|  | Multi-Cloud      ||                                             |  Custom slash commands ||
+|  | DevOps Mode      ||                                             +----------+------------+|
+|  |                  ||                                                        |             |
+|  | 6 rules          ||      +---------------------------------------------+  |             |
+|  | 2 skills         ||      |  4 PARALLEL SPECIALIST SUBAGENTS             |  |             |
+|  | evidence-first   ||      |  +------------+  +------------+              |  |             |
+|  +--------+---------+|      |  | Application|  |   Cloud    |              |  |             |
+|           |          |      |  | Analyst    |  |  Architect |              |  |             |
+|           |          |      |  +------------+  +------------+              |  |             |
+|           |          |      |  +------------+  +------------+              |  |             |
+|           |          |      |  | Security   |  |  Release   |              |  |             |
+|           |          |      |  | Reviewer   |  |  Verifier  |              |  |             |
+|           |          |      |  +------------+  +------------+              |  |             |
+|           |          |      |           v synthesize                       |  |             |
+|           |          |      |   Single deployment plan + rationale         |  |             |
+|           v          |      +------------------------------------------+  |  |             |
+|  MCP stdio channel   |                                                 |  +--+             |
++----------------------+                                                 |                   |
+                                                                         v                   |
++-----------------------------------------------------------+                                |
+|  apps/bob-mcp  (MCP stdio server)                        |<-------------------------------+|
+|                                                          |                                 |
+|  17 lifecycle tools -- deliberately NO approve tool      |                                 |
+|  devops_create_run        devops_record_analysis         |                                 |
+|  devops_submit_plan       devops_execute_plan            |                                 |
+|  devops_wait              devops_verify                  |                                 |
+|  devops_get_incident      devops_record_diagnosis        |                                 |
+|  devops_propose_remediation  devops_execute_remediation  |                                 |
+|  devops_export_evidence   devops_get_logs  ...           |                                 |
+|                                                          |                                 |
+|  HTTP --> localhost:4000                                 |                                 |
++------------------------+---------------------------------+                                 |
+                         |                                                                   |
+                         v                                                                   |
++----------------------------------------------------------------------------------------+  |
+|  apps/orchestrator  (Hono 4 - TypeScript ESM)                                         |  |
+|                                                                                        |  |
+|  +---------------------------------------------------------------------+              |  |
+|  |  STATE MACHINE  (packages/core/src/state-machine.ts)                |              |  |
+|  |                                                                     |              |  |
+|  |  created --> analyzed --> awaiting_approval                         |              |  |
+|  |                               v  HUMAN approves                     |              |  |
+|  |                           approved --> deploying --> verifying      |              |  |
+|  |                                                         v           |              |  |
+|  |                                                     healthy <-------+              |  |
+|  |                                                         v  sentinel                |  |
+|  |                                                    incident                        |  |
+|  |                                                         v                          |  |
+|  |  awaiting_remediation_approval --> remediating --> verifying                       |  |
+|  +---------------------------------------------------------------------+              |  |
+|                                                                                        |  |
+|  +--------------------+   +------------------+  +-----------------------------+       |  |
+|  | Approval guard     |   | Evidence store   |  | SSE event stream --> UI     |       |  |
+|  | SHA-256 plan hash  |   | audit trail      |  | /api/runs/:id/events        |       |  |
+|  | 403 guard.blocked  |   | immutable events |  | real-time run updates       |       |  |
+|  +--------------------+   +------------------+  +-----------------------------+       |  |
++----------------------------+----------------------------+-----------------------------+  |
+                             |                            |                                 |
+            +----------------+                            +------------------+              |
+            v                                                                v              |
++---------------------------+                             +---------------------------+    |
+|  IBM CLOUD                |                             |  AWS                      |    |
+|                           |                             |                           |    |
+|  Code Engine              |                             |  Lambda + Function URL    |    |
+|  +- always-on container   |                             |  +- on-demand             |    |
+|  +- scale-to-zero         |                             |  +- provisioned concur.   |    |
+|                           |                             |                           |    |
+|  Cloudant (NoSQL)         |                             |  CloudWatch Logs          |    |
+|  +- state persistence     |                             |  versions + alias rollback|    |
+|  +- audit records         |                             |                           |    |
+|                           |                             |                           |    |
+|  watsonx.ai WML           |                             |                           |    |
+|  +- IBM Granite 3-8B      |                             |                           |    |
+|     Watson Agent Q&A      |                             |                           |    |
++---------------------------+                             +---------------------------+    |
+            ^                                                                ^              |
+            |                                                                |              |
+            +----------------------------------+-----------------------------+              |
+                                               |                                           |
++----------------------------------------------+------------------------------------------+|
+|  GitHub Actions                                                                          ||
+|                                                                                          ||
+|  validate.yml       --> lint + typecheck + 55 unit tests on every push                  ||
+|  deploy.yml         --> production deploy workflow (human-triggered)                    ||
+|  health-sentinel.yml --> */5 cron - probes /health on every deployed endpoint           ||
+|                          3 consecutive failures --> GitHub Issue with JSON evidence     ||
+|                          orchestrator imports issue as incident within 60s              ||
++------------------------------------------+-----------------------------------------------+
+                                            |
+                                            v
++--------------------------------------------------------------------------------------------+
+|  apps/control-center  (Next.js 15 + Tailwind v4)                 <-- HUMAN LIVES HERE     |
+|                                                                                            |
+|  +-------------+  +-------------+  +-------------+  +------------------------+           |
+|  | Lifecycle   |  | Plan +      |  | Incidents + |  | Watson Agent           |           |
+|  | Stepper     |  | Approval    |  | Audit Trail |  | IBM Granite 3-8B       |           |
+|  +-------------+  +-------------+  +-------------+  +------------------------+           |
+|                                                                                            |
+|  Approve plan ----------------------------------------------------------------> Orchestrator
+|  (human token -- Bob NEVER knows this token)                                              |
++--------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## ⚡ Executive Summary: What Makes AXIS Different
+## What is AXIS?
 
-Most developer deployment tooling falls into one of two extremes:
-1. **Dumb CI/CD Pipelines**: Hardcoded YAML scripts that fail blindly when configurations drift, require manual Dockerfile maintenance, and offer zero automated incident diagnosis.
-2. **Unsafe "Autonomous" AI Toys**: AI wrappers with unchecked terminal permissions that hallucinate cloud modifications, risk deleting production infrastructure, and leak sensitive credentials into model contexts.
+**AXIS (Agentic eXecution Infrastructure as a Service)** is an evidence-driven, approval-gated, multi-cloud DevOps agent built on top of IBM Bob 2.0 and IBM watsonx.ai. Hand it a repository and a deployment goal. AXIS understands the application, spawns four specialist subagents in parallel, proposes a safe architecture-backed plan, enforces cryptographic approval gates, provisions and deploys to IBM Cloud and AWS simultaneously, verifies health with live evidence, and when a fault is detected, diagnoses the root cause, proposes the smallest safe remediation, and executes it upon your approval.
 
-**AXIS establishes a new paradigm: Agentic DevOps with Inflexible Cryptographic Governance.**
-
-- **The Developer Stays in Command**: IBM Bob 2.0 acts as your principal multi-cloud DevOps engineer. It reads your codebase, identifies dependencies, generates missing deployment files, and designs multi-cloud architectures. However, **Bob has zero permissions to deploy without human sign-off**.
-- **Cryptographic Hash Binding**: Every deployment plan and remediation patch is hashed using SHA-256. When a human reviews and clicks **Approve** in the AXIS Control Center, that specific hash is authorized. If the model or any unauthorized actor alters even a single byte of configuration, execution is rejected with `403 guard.blocked`.
-- **Zero-Secret Leakage Protocol**: The custom MCP bridge between Bob and the orchestrator deliberately omits approval capabilities. Secrets matching sensitive patterns (`TOKEN`, `API_KEY`, `PASSWORD`) travel only as references (`secretRefs`) and are cryptographically scrubbed from logs and events.
-- **Autonomous Cross-Cloud Self-Healing**: Outages are not monitored through expensive proprietary silos. An independent GitHub Actions Sentinel probes endpoints across clouds. Failures are written as machine-readable JSON into GitHub Issues. Bob diagnoses the exact file and line causing the failure, proposes the smallest safe remediation, and upon approval, heals the infrastructure in **7–9 seconds**.
+This is not another CI/CD file generator. It is a connected, evidence-backed lifecycle where every cloud change is approved by a human and every health claim is backed by proof.
 
 ---
 
-## 📊 Measured Benchmark Metrics (Real Cloud Verification)
+## The Eight-Stage Lifecycle
 
-These metrics were recorded during live test executions against **AWS Lambda** (`us-east-1`) and **IBM Cloud** with zero mocked APIs:
+```
+UNDERSTAND --> PLAN --> PROVISION --> BUILD --> TEST --> DEPLOY --> VERIFY --> RECOVER
+```
 
-| Metric | Measured Real Value | Traditional Manual Baseline | Improvement |
-|---|---|---|---|
-| **Time to Verified Multi-Cloud Deploy** | **42 seconds** | ~45 minutes (consoles, IAM, zipping) | **64x faster** |
-| **Mean Time to Recovery (MTTR)** | **7 – 9 seconds** | ~120 minutes (2 AM alert, log grep) | **900x faster** |
-| **Human Actions Required** | **2 clicks** (Plan + Remediation) | ~25 manual console steps | **92% reduction** |
-| **Unsafe / Unauthorized Actions Blocked** | **100% (`403 guard.blocked`)** | Prone to human/script error | **Zero risk** |
-| **Cloud Consoles Required to Open** | **0** (Zero) | 2+ (AWS Console, IBM Cloud portal) | **Friction eliminated** |
-| **Automated Test Coverage** | **55 / 55 tests passing** | Varies | **100% green** |
+| Stage | What Happens | Actor |
+|---|---|---|
+| **UNDERSTAND** | 4 specialist subagents analyze the repository in parallel | IBM Bob + subagents |
+| **PLAN** | Single synthesized deployment plan with architecture rationale | IBM Bob |
+| *(Approval gate)* | Plan hash locked; execute without approval returns HTTP 403 | Human in Control Center |
+| **PROVISION** | Cloud resources verified or created | Orchestrator -> IBM Cloud / AWS |
+| **BUILD** | Source compiled, Lambda bundled, container built | Orchestrator -> cloud |
+| **TEST** | Vitest suite gates the release | Orchestrator |
+| **DEPLOY** | IBM Code Engine + AWS Lambda deploy in parallel | Orchestrator -> both clouds |
+| **VERIFY** | `/health` probed, provider status captured, evidence recorded | Orchestrator |
+| **RECOVER** | Sentinel detects fault -> Bob diagnoses -> human approves -> re-verified | IBM Bob + Human |
 
 ---
 
-## 🤖 IBM watsonx.ai & Granite Deep Integration
+## Key Design Decisions
 
-AXIS deeply integrates IBM watsonx.ai at multiple architectural layers:
+### 1. The Approval Guard
+The orchestrator computes a SHA-256 hash of every submitted plan. `devops_execute_plan` is rejected with `403 guard.blocked` unless the exact plan hash has been approved by a human bearing the `APPROVAL_TOKEN`. Bob deliberately calls `devops_execute_plan` early — the 403 appears in the audit trail — proving the guard is structural, not cosmetic.
+
+### 2. No Approve Tool in the MCP Server
+[`apps/bob-mcp/src/tools.ts`](apps/bob-mcp/src/tools.ts) registers exactly 17 tools. There is deliberately no `devops_approve` tool. Humans approve in the Control Center using a token Bob never sees. Bob proposes; humans decide.
+
+### 3. One Provider Contract, Two Real Clouds
+[`packages/core/src/provider-contract.ts`](packages/core/src/provider-contract.ts) defines a single `CloudProvider` interface. Both [`packages/provider-ibm-cloud`](packages/provider-ibm-cloud/src/provider.ts) and [`packages/provider-aws`](packages/provider-aws/src/provider.ts) implement it. Adding Vercel or Railway in V2 requires zero workflow changes — just a new package and a registry entry.
+
+### 4. Evidence Taxonomy
+Every audit event carries one of five labels: `observation | inference | proposal | action | verification`. Judges and developers can follow exactly what Bob concluded, proposed, and why.
+
+### 5. GitHub Issues as the Cross-Cloud Incident Bus
+The GitHub Actions health sentinel writes machine-readable JSON evidence directly into a GitHub issue. The orchestrator imports it within 60 seconds. No separate observability platform. No proprietary alert channel.
+
+---
+
+## IBM watsonx.ai Integration
+
+AXIS integrates IBM watsonx.ai at two levels:
+
+### Level 1 — IBM Bob IDE (Inference Engine)
+IBM Bob 2.0 uses **IBM Granite** as its foundation model for all agentic reasoning: specialist subagent analysis, plan synthesis, incident diagnosis, and remediation proposals. The custom DevOps mode constrains the model to evidence-first conclusions and approval-gated actions.
+
+### Level 2 — Watson Agent (Interactive Copilot in the Control Center)
+The [`apps/control-center/components/watson-agent.tsx`](apps/control-center/components/watson-agent.tsx) component connects to the [`/api/watson/ask`](apps/orchestrator/src/routes/watson.ts) endpoint. This is a live, context-aware Q&A interface powered by **IBM Granite 3-8B Instruct** (`ibm/granite-3-8b-instruct`) that can answer questions about:
+
+- IBM Cloudant database status, schema, and connection latency
+- Live deployment topology (IBM Code Engine endpoints, AWS Lambda Function URLs)
+- Self-healing incident history (root cause, MTTR, remediation actions)
+- Cryptographic approval gate mechanics
+- Multi-cloud cost estimates
 
 ```
-+---------------------------------------------------------------------------------------+
-|                              IBM watsonx.ai ECOSYSTEM                                 |
-|                                                                                       |
-|   +---------------------------------------+   +------------------------------------+  |
-|   |  IBM Bob 2.0 (Foundation Reasoner)    |   |  Watson Agent Copilot (Control UI) |  |
-|   |  Model: IBM Granite                   |   |  Model: ibm/granite-3-8b-instruct  |  |
-|   |  Role: Multi-Agent DevOps Synthesis   |   |  Role: NoSQL DB & System Q&A       |  |
-|   +-------------------+-------------------+   +------------------+-----------------+  |
-|                       |                                          |                    |
-|                       v                                          v                    |
-|   +---------------------------------------+   +------------------------------------+  |
-|   |  Code & Topology Analysis             |   |  IBM Cloudant NoSQL Telemetry      |  |
-|   |  4 Specialist Subagents               |   |  Live AWS Lambda Latency & Health  |  |
-|   |  Evidence-Backed Incident Diagnosis   |   |  Granite AI Security Narratives    |  |
-|   +---------------------------------------+   +------------------------------------+  |
-+---------------------------------------------------------------------------------------+
-```
-
-### 1. Embedded Watson Agent (Interactive Control Center Copilot)
-Located under the **Watson Agent (Ask AI)** tab in the Control Center, this live interface uses **IBM Granite 3-8B Instruct** (`ibm/granite-3-8b-instruct`) connected directly to orchestrator telemetry:
-- **Cloudant Database Telemetry**: Answers natural language questions regarding database health, document counts, and sync latency.
-- **Incident Root-Cause Explanations**: Translates raw probe JSON blobs and stack traces into clear, executive explanations of outages.
-- **Multi-Cloud Topology Analysis**: Compares active latency and throughput between AWS Lambda and IBM Cloud Code Engine.
-
-#### Sample Live Prompt & Granite Synthesis:
-```
-User: "Explain the root cause of our latest incident and how it was healed."
+User: "Explain how Bob diagnosed and recovered the 503 incident"
 
 Watson Agent (IBM Granite 3-8B):
-  "Analysis of incident inc_c970842da6 reveals a configuration drift event:
-   - Root Cause: Missing required environment variable CATALOG_MODE in src/config.ts line 12.
-   - Detection: GitHub Sentinel recorded three consecutive HTTP 503 responses on /health.
-   - Remediation: IBM Bob generated a patch to restore CATALOG_MODE=featured with low risk.
-   - Verification: Authorized by human token; service re-verified healthy in 9 seconds."
+  Root Cause Identified by Bob: Configuration drift -- missing required
+  environment variable CATALOG_MODE, triggering HTTP 503 on the /health probe.
+  Remediation Action: Automatic restoration of CATALOG_MODE=featured via
+  orchestrator set_env patch.
+  Recovery Time (MTTR): Recovered in 7 seconds upon human approval.
 ```
 
-### 2. Granite AI Chaos Narrative & Resend Security Alerting
-When an outage or controlled chaos is triggered via `POST /api/demo/collapse`, AXIS:
-1. Simulates an emergency configuration drift on the microservice.
-2. Invokes **IBM Granite** to synthesize a high-impact incident impact narrative.
-3. Automatically dispatches an HTML emergency notification via the **Resend API** detailing:
-   - Affected cloud provider (AWS Lambda / IBM Cloud)
-   - Granite-generated root-cause breakdown
-   - One-click link to the Control Center approval queue
+The Watson Agent has live access to orchestrator state (runs, incidents, approvals, deployments) and provides suggested follow-up questions to guide deeper exploration.
 
 ---
 
-## 🛠️ The 8-Stage Agentic Lifecycle
+## Demo: Full End-to-End Workflow
+
+### Act 1: Zero to Verified Multi-Cloud (approx. 7 minutes)
 
 ```
-[1. UNDERSTAND] ➔ [2. PLAN] ➔ [3. PROVISION] ➔ [4. BUILD] ➔ [5. TEST] ➔ [6. DEPLOY] ➔ [7. VERIFY] ➔ [8. RECOVER]
+You                              IBM Bob                          System
+-------------------------------------------------------------------------
+/deploy apps/demo-service   -->  creates todo list
+  Deploy Nimbus Books to          devops_list_providers
+  IBM Cloud + AWS                 devops_create_run
+                                  |
+                            4 subagents spawn in PARALLEL ------> repo analysis
+                              analyst / architect                  file inspection
+                              security / release                   dependency scan
+                                  | synthesize
+                            devops_record_analysis
+                            generates Dockerfile, .ceignore,
+                            lambda.ts (repo had NONE of these)
+                            devops_submit_plan ---------------> plan hash locked
+                            devops_execute_plan --------------> 403 guard.blocked <-- LIVE IN AUDIT TRAIL
+
+You approve in               <-- Control Center shows
+Control Center               plan hash, architecture
+                             rationale, risks, cost
+
+                            devops_wait(plan_decided) --------->
+                            devops_execute_plan --------------> TEST --> PROVISION
+                                                                BUILD --> DEPLOY (parallel)
+                                                                IBM Code Engine + AWS Lambda
+                                                                VERIFY (both /health probed)
 ```
 
-| Lifecycle Stage | Autonomous Agent Action (Bob 2.0) | Human Decision Gate | Verification Standard |
-|---|---|---|---|
-| **1. UNDERSTAND** | Spawns 4 specialist subagents in parallel to inspect runtime, dependencies, and security. | Observes live streaming thought feed in UI. | File citation for every finding. |
-| **2. PLAN** | Synthesizes architecture choices per cloud (Always-Warm vs Scale-to-Zero) with rationale. | **Gate 1**: Reviews architecture rationale and clicks **Approve**. | Plan locked to SHA-256 hash. |
-| **3. PROVISION** | Verifies cloud IAM policies, endpoints, and Function URLs. | None (Automated). | Resource regex validation (`^bobops-`). |
-| **4. BUILD** | Synthesizes missing `Dockerfile`, `src/lambda.ts`, bundles ESM via esbuild. | None (Automated). | Build exit code 0. |
-| **5. TEST** | Executes pre-deploy Vitest test suites. | None (Automated release gate). | All tests must pass before deploy. |
-| **6. DEPLOY** | Executes parallel cloud deployment to AWS Lambda and IBM Cloud. | None (Guarded by Gate 1). | Atomic alias update (`live`). |
-| **7. VERIFY** | Probes live `/health` endpoints and captures provider revision strings. | Inspects live URL and latency in UI. | HTTP 200 OK + revision match. |
-| **8. RECOVER** | Correlates probe JSON, CloudWatch logs, and code; formulates safe patch. | **Gate 2**: Reviews cited diagnosis and clicks **Approve Fix**. | Service restored; issue auto-closed. |
+Both cloud endpoints return `HTTP 200` with `{ "status": "ok", "revision": "..." }`. The Control Center shows live URLs, latency, and provider-native status.
+
+### Act 2: Break It, Detect It, Recover It (approx. 5 minutes)
+
+```
+You                              GitHub Actions                    IBM Bob
+-------------------------------------------------------------------------
+Inject fault                -->  health-sentinel runs
+  (removes CATALOG_MODE)          3 probes x 503
+                                  opens GitHub Issue
+                                  with JSON evidence blob
+                            <--- Orchestrator imports
+                                 incident within 60 s
+                                 run state --> INCIDENT
+
+/investigate                -->  devops_sync_incidents
+                                 devops_get_incident
+                                 devops_get_logs
+                                 reads src/config.ts
+                                 devops_record_diagnosis
+                                   "CATALOG_MODE missing,
+                                    config.ts line 12"
+                                 devops_propose_remediation
+                                   set_env CATALOG_MODE=featured
+
+You approve in               <-- Control Center shows
+Control Center                   diagnosis card + remediation
+
+                            -->  devops_execute_remediation
+                                 Lambda/Cloud env updated
+                                 re-verified --> healthy
+                                 GitHub Issue auto-closed
+                                 devops_export_evidence
+```
 
 ---
 
-## 💰 Multi-Cloud Cost Estimator & Live Brain Feed
+## Repository Structure
 
-The AXIS Control Center features two standout engineering innovations:
-
-### 1. Interactive Multi-Cloud Cost Estimator (`cost-estimator.tsx`)
-- **Accurate Real-Time Cloud Pricing**:
-  - **IBM Cloud Code Engine**: `$0.000034/vCPU-s` + `$0.0000045/GB-s` with free tier deductions (`100k vCPU-s`, `200k GB-s`) and 24/7 warm container baseline modeling.
-  - **AWS Lambda**: `$0.20/1M req` + `$0.0000166667/GB-s` with free tier deductions (`1M req`, `400k GB-s`) and Provisioned Concurrency baseline modeling.
-- **Dynamic Workload Sliders**: Adjust monthly invocations (`50k – 5M`), average duration (`30ms – 1000ms`), and memory allocation (`256 MB – 2048 MB`).
-- **Interactive Architecture Toggles**: Switch between `Always-Warm` and `Scale-to-Zero / On-Demand` on each cloud to observe instant cost and latency tradeoffs.
-- **Dynamic SVG Tier Comparison Chart**: Real-time horizontal bar visualization comparing all 4 deployment tiers side-by-side with cold-start indicators and a `← best` badge.
-- **Traditional VM Savings Analysis**: Automatically computes cost reductions vs traditional dual fixed cloud virtual machines (`$87.00/mo` baseline).
-
-### 2. Real-Time Streaming Brain Feed (`brain-feed.tsx` & `global-brain-feed.tsx`)
-- Displays live, categorized agent thoughts during the `UNDERSTAND`, `PLAN`, and `RECOVER` stages.
-- Every event is classified according to the 5-label evidence taxonomy:
-  - `observation` (Blue) — Direct file or probe measurements.
-  - `inference` (Purple) — Specialist conclusions and architectural reasoning.
-  - `proposal` (Yellow) — Actionable plans awaiting authorization.
-  - `action` (Cyan) — Cloud modifications and build executions.
-  - `verification` (Green) — Live HTTP health assertions.
+```
+AXIS/
++-- apps/
+|   +-- orchestrator/          # Hono 4 API - lifecycle state machine - approval guard - SSE
+|   |   +-- src/
+|   |       +-- routes/        # runs, approvals, incidents, providers, watson, demo, events
+|   |       +-- providers/     # registry + IBM Cloud + AWS adapters
+|   |       +-- store/         # in-memory evidence store + JSON persistence
+|   |
+|   +-- control-center/        # Next.js 15 + Tailwind v4 - approval UI - audit trail
+|   |   +-- app/               # page.tsx (runs list) + run/page.tsx (run detail)
+|   |   +-- components/        # lifecycle-stepper, plan-panel, approval-queue,
+|   |                          # incidents-panel, audit-trail, watson-agent, logs-panel ...
+|   |
+|   +-- bob-mcp/               # MCP stdio server - 17 lifecycle tools - NO approve tool
+|   |   +-- src/
+|   |       +-- tools.ts       # all 17 tool registrations
+|   |       +-- client.ts      # typed HTTP client -> orchestrator
+|   |       +-- summarize.ts   # run -> human-readable summary for Bob's context
+|   |
+|   +-- demo-service/          # Hono micro-service - Nimbus Books catalog API
+|       +-- src/
+|           +-- app.ts         # /health - /books - /books/:id endpoints
+|           +-- config.ts      # CATALOG_MODE env var (intentional fault target)
+|           +-- lambda.ts      # AWS Lambda handler wrapper
+|
++-- packages/
+|   +-- core/                  # Domain schemas - state machine - provider contract
+|   |   +-- src/
+|   |       +-- schemas.ts     # ALL domain shapes (zod) -- single source of truth
+|   |       +-- state-machine.ts  # explicit state transitions with guards
+|   |       +-- provider-contract.ts  # CloudProvider interface
+|   |       +-- sentinel.ts    # incident evidence schema
+|   |
+|   +-- provider-ibm-cloud/    # IBM Cloud Code Engine adapter (CLI-based)
+|   +-- provider-aws/          # AWS Lambda + CloudWatch adapter (SDK v3)
+|   +-- github/                # Octokit - issues - Actions variables - sentinel sync
+|
++-- infra/
+|   +-- ibm-cloud/             # IBM Cloud infrastructure as code
+|   +-- aws/                   # AWS infrastructure as code (IAM, Lambda role)
+|
++-- .bob/
+|   +-- custom_modes.yaml      # Multi-Cloud DevOps Engineer mode definition
+|   +-- mcp.json               # MCP server registration (auto-configured by setup)
+|   +-- rules-multicloud-devops/  # 6 mode rules: evidence, approvals, cloud ops ...
+|   +-- skills/                # deploy skill + investigate skill
+|
++-- .github/
+|   +-- workflows/
+|       +-- validate.yml       # lint + typecheck + tests on every push
+|       +-- deploy.yml         # production deployment workflow
+|       +-- health-sentinel.yml  # */5 cron health probe --> GitHub Issues
+|
++-- docs/
+|   +-- architecture/          # System architecture overview
+|   +-- demo/                  # Demo script + golden assets
+|   +-- plan/                  # 15-phase implementation plan
+|   +-- roadmap/               # V2: Vercel + Railway + GCP
+|
++-- evidence/
+|   +-- demo-runs/             # Exported audit trails from live demo runs
+|
++-- scripts/                   # setup/init-dev.ts - demo/fault.ts - sentinel/run.ts
+```
 
 ---
 
-## 🚀 Quickstart & Zero-Friction Onboarding
-
-We provide automated setup scripts that configure dependencies, build the MCP bundle, and detect your local filesystem paths automatically.
+## Getting Started
 
 ### Prerequisites
-- **Node.js**: `>= 22` LTS (`node -v`)
-- **pnpm**: `9.x` (`corepack enable && corepack prepare pnpm@9.15.0 --activate`)
-- **Git**: Installed and configured
-- **IBM Bob 2.0**: Installed
+
+| Requirement | Version | Check |
+|---|---|---|
+| Node.js LTS | `>= 22` | `node -v` |
+| pnpm | `9.x` | `pnpm -v` |
+| IBM Bob 2.0 | latest | IBM Bob IDE |
+| Git | any | `git -v` |
+
+> **Cloud credentials** are required to run live deployments. Local development with replay data works without credentials.
 
 ---
 
-### Step 1: Clone Repository
+### One-Command Setup
+
+**macOS / Linux:**
 ```bash
 git clone https://github.com/yashchandnani07/AXIS---Agentic-eXecution-Infrastructure-as-a-Service.git
 cd AXIS---Agentic-eXecution-Infrastructure-as-a-Service
-```
-
-### Step 2: Configure Secrets (`.env`)
-Create `.env` in the repository root and add your credentials:
-```bash
-cp .env.example .env
-```
-```env
-# Orchestrator & UI Tokens
-ORCHESTRATOR_PORT=4000
-CONTROL_CENTER_ORIGIN=http://localhost:3000
-APPROVAL_TOKEN=your-random-approval-token-here
-DEMO_MODE=true
-
-# IBM Cloud (Code Engine + Cloudant + watsonx.ai)
-IBMCLOUD_API_KEY=your_ibm_api_key
-IBMCLOUD_REGION=us-south
-IBM_CE_PROJECT=bobops-demo
-IBM_CLOUDANT_URL=https://your-cloudant-instance.cloudantnosqldb.appdomain.cloud
-IBM_WATSONX_PROJECT_ID=your_project_id
-
-# AWS (Lambda + Function URL)
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_REGION=us-east-1
-AWS_LAMBDA_ROLE_ARN=arn:aws:iam::your_account_id:role/bobops-lambda-execution-role
-
-# GitHub Integration
-GITHUB_TOKEN=your_github_personal_access_token
-GITHUB_OWNER=your_github_username
-GITHUB_REPO=AXIS---Agentic-eXecution-Infrastructure-as-a-Service
-```
-
-### Step 3: Run One-Click Automated Setup
-Run the setup script for your operating system:
-
-**On Windows (PowerShell):**
-```powershell
-.\setup.ps1
-```
-
-**On macOS / Linux:**
-```bash
 chmod +x ./setup.sh && ./setup.sh
 ```
 
-**Or directly via pnpm:**
-```bash
-pnpm install
-pnpm onboard
+**Windows (PowerShell):**
+```powershell
+git clone https://github.com/yashchandnani07/AXIS---Agentic-eXecution-Infrastructure-as-a-Service.git
+cd AXIS---Agentic-eXecution-Infrastructure-as-a-Service
+.\setup.ps1
 ```
 
-> **What `pnpm onboard` handles automatically:**
-> 1. Synchronizes `APPROVAL_TOKEN` to `apps/control-center/.env.local`.
-> 2. Compiles `apps/bob-mcp/dist/bob-mcp.mjs` using esbuild.
-> 3. **Detects your local machine's exact path** and registers it in `.bob/mcp.json`.
-> 4. Stages microservice demo assets in `apps/demo-service/`.
-> 5. Runs the entire 55-test Vitest suite to guarantee a green build.
+The setup script does the following automatically:
+
+1. Installs all pnpm workspace packages (`pnpm install`)
+2. Syncs `APPROVAL_TOKEN` from root `.env` to `apps/control-center/.env.local`
+3. Bundles the MCP server (`apps/bob-mcp/dist/bob-mcp.mjs`) with esbuild
+4. Patches `.bob/mcp.json` with your machine's absolute path so IBM Bob finds the server
+5. Stages demo service deployment assets (`Dockerfile`, `src/lambda.ts`)
+6. Runs the full test suite (`pnpm test` — 55 tests must be green)
 
 ---
 
-### Step 4: Start Development Servers
+### Configure Environment Variables
+
+Copy `.env.example` to `.env` and fill in your credentials:
+
+```bash
+cp .env.example .env
+```
+
+```env
+# Orchestrator
+ORCHESTRATOR_PORT=4000
+CONTROL_CENTER_ORIGIN=http://localhost:3000
+APPROVAL_TOKEN=<24-random-chars>      # human approval -- Bob never sees this
+DEMO_MODE=true
+DATA_DIR=.data
+
+# IBM Cloud (Code Engine)
+IBMCLOUD_API_KEY=<your-api-key>
+IBMCLOUD_REGION=us-south
+IBM_CE_PROJECT=bobops-demo
+
+# AWS (Lambda)
+AWS_ACCESS_KEY_ID=<your-key-id>
+AWS_SECRET_ACCESS_KEY=<your-secret>
+AWS_REGION=us-east-1
+AWS_LAMBDA_ROLE_ARN=<arn:aws:iam::...>
+
+# GitHub (sentinel incidents)
+GITHUB_TOKEN=<gh-auth-token>
+GITHUB_OWNER=<your-org-or-user>
+GITHUB_REPO=AXIS---Agentic-eXecution-Infrastructure-as-a-Service
+```
+
+> **Security note:** Never commit `.env`. Never paste credentials into the Bob chat. AXIS deliberately blocks any path where secrets could leak through the MCP channel.
+
+---
+
+### Start the Local Environment
+
 ```bash
 pnpm dev
 ```
-- **AXIS Control Center Web UI**: [**`http://localhost:3000`**](http://localhost:3000)
-- **AXIS Orchestrator REST API**: [**`http://localhost:4000/api/health`**](http://localhost:4000/api/health)
+
+| Service | URL | Purpose |
+|---|---|---|
+| Control Center | `http://localhost:3000` | Approval UI, audit trail, Watson Agent |
+| Orchestrator API | `http://localhost:4000` | REST API + SSE event stream |
+| API Health | `http://localhost:4000/api/health` | Liveness check |
 
 ---
 
-### Step 5: Run with IBM Bob 2.0
-1. Open this repository in **IBM Bob 2.0**.
-2. Open the **MCP Panel** in Bob:
-   - Confirm **`bobops-orchestrator`** is listed as **active with 17 tools**.
-3. Select the mode: **`🛰️ Multi-Cloud DevOps Engineer`**.
-4. In the Bob chat, run:
-   ```text
-   /deploy apps/demo-service
-   ```
-5. Watch the parallel specialist subagents analyze the repository, view the live plan in the Control Center at `http://localhost:3000`, and click **Approve** to execute the multi-cloud release!
+### Configure IBM Bob 2.0
+
+1. Open this repository folder in **IBM Bob**.
+2. Open the **MCP Panel** and verify `bobops-orchestrator` is **active** with **17 tools**.
+   *(If Bob was open during setup, click the reload icon.)*
+3. In the mode selector, choose **Multi-Cloud DevOps Engineer**.
+4. Type `/deploy apps/demo-service` and follow Bob's interactive prompts.
+5. Approve the plan at `http://localhost:3000`.
 
 ---
 
-## 🧪 Comprehensive Testing & Verification Commands
-
-AXIS includes rigorous end-to-end verification suites covering unit tests, type safety, and real-cloud deployments:
+## Available Commands
 
 ```bash
-# Run full Vitest suite (55 unit & state machine tests)
-pnpm test
+# Development
+pnpm dev                    # Start orchestrator (:4000) + control center (:3000)
+pnpm dev:api                # Orchestrator only
+pnpm dev:ui                 # Control Center only
 
-# Run TypeScript typecheck across all 10 packages
-pnpm typecheck
+# Quality
+pnpm test                   # Run 55 unit tests (Vitest)
+pnpm typecheck              # Full TypeScript check across all packages
 
-# Build single-file MCP bundle for IBM Bob
-pnpm build:mcp
+# Build
+pnpm build:mcp              # Bundle MCP server with esbuild
 
-# Execute Full End-to-End Test on LIVE AWS Lambda (Deploy + Fault + Self-Heal in 9s)
+# Demo lifecycle
+pnpm demo:reset             # Wipe orchestrator state, remove generated assets
+pnpm demo:fault             # Inject CATALOG_MODE fault (same as UI button)
+pnpm demo:golden            # Stage golden demo assets
+pnpm demo:replay            # Load a recorded replay run
+
+# Cloud smoke tests (requires credentials)
+pnpm smoke:ibm              # Verify IBM Cloud connection
+pnpm smoke:aws              # Verify AWS Lambda connection
+
+# End-to-end test (live clouds)
 npx tsx scripts/demo/api-e2e.ts --targets aws --with-recovery --fault-provider aws
-
-# Run the independent GitHub Health Sentinel prober locally
-npx tsx scripts/sentinel/run-sentinel.ts
-
-# Build offline static replay package for zero-friction judge evaluation
-pnpm demo:replay
 ```
 
 ---
 
-## 🧰 MCP Tool Catalog: The 17 Bridge Tools
+## The MCP Server: 17 Lifecycle Tools
 
-The custom MCP server in [`apps/bob-mcp`](apps/bob-mcp) connects IBM Bob 2.0 to the orchestrator:
+[`apps/bob-mcp/src/tools.ts`](apps/bob-mcp/src/tools.ts) registers exactly 17 tools. The tool descriptions are themselves prompts that guide Bob through the lifecycle and specify the expected next tool call.
 
-| Tool Name | Stage | Description |
+| Tool | Stage | Description |
 |---|---|---|
-| `devops_list_providers` | OBSERVE | Lists active cloud providers and authenticated capabilities. |
-| `devops_list_runs` | OBSERVE | Retrieves recent deployment runs and lifecycle states. |
-| `devops_create_run` | UNDERSTAND | Initializes a deployment run with targets and sentinel interval. |
-| `devops_record_analysis` | UNDERSTAND | Commits synthesized findings from the 4 specialist subagents. |
-| `devops_log_note` | ANY | Appends a labeled audit event to the permanent evidence record. |
-| `devops_submit_plan` | PLAN | Submits the deployment plan and initiates SHA-256 hash locking. |
-| `devops_wait` | PLAN | Long-polls until `plan_decided`, `deployed`, or `recovered`. |
-| `devops_execute_plan` | DEPLOY | Executes approved deployment (**Returns 403 if not approved**). |
-| `devops_verify` | VERIFY | Probes live cloud `/health` endpoints and captures revisions. |
-| `devops_get_run` | OBSERVE | Retrieves aggregate run status, deployments, and health history. |
-| `devops_get_logs` | OBSERVE | Queries CloudWatch or Code Engine runtime logs for diagnosis. |
-| `devops_sync_incidents` | RECOVER | Pulls incident issues filed by the GitHub Sentinel. |
-| `devops_get_incident` | RECOVER | Retrieves incident evidence, failing probe bodies, and timestamps. |
-| `devops_record_diagnosis` | RECOVER | Commits evidence-backed root-cause diagnosis citing specific lines. |
-| `devops_propose_remediation` | RECOVER | Submits minimal remediation patch (e.g. `set_env CATALOG_MODE=featured`). |
-| `devops_execute_remediation` | RECOVER | Executes approved remediation and re-verifies health. |
-| `devops_export_evidence` | COMPLETE | Generates markdown and JSON audit trail in `evidence/demo-runs/`. |
+| `devops_list_providers` | OBSERVE | List authenticated cloud providers |
+| `devops_list_runs` | OBSERVE | List recent deployment runs with state |
+| `devops_create_run` | UNDERSTAND | Start a new deployment run |
+| `devops_record_analysis` | UNDERSTAND | Record synthesized specialist findings |
+| `devops_log_note` | any | Append a labelled observation / inference / proposal |
+| `devops_submit_plan` | PLAN | Submit deployment plan (opens approval gate) |
+| `devops_wait` | PLAN | Block until `plan_decided` / `deployed` / `recovered` |
+| `devops_execute_plan` | DEPLOY | Execute *approved* plan (403 if not approved) |
+| `devops_verify` | VERIFY | Probe every deployed endpoint now |
+| `devops_get_run` | OBSERVE | Compact run summary with health per provider |
+| `devops_get_logs` | OBSERVE | Runtime log lines (Code Engine / CloudWatch) |
+| `devops_sync_incidents` | RECOVER | Import open sentinel issues as incidents |
+| `devops_get_incident` | RECOVER | Full incident evidence (probe bodies, logs) |
+| `devops_record_diagnosis` | RECOVER | Record evidence-backed root cause |
+| `devops_propose_remediation` | RECOVER | Propose `set_env` or `rollback` (opens approval gate) |
+| `devops_execute_remediation` | RECOVER | Execute *approved* remediation + re-verify |
+| `devops_export_evidence` | COMPLETE | Write audit trail to `evidence/demo-runs/` |
+
+> **There is no `devops_approve` tool.** This is intentional. The approve action lives in the Control Center and requires a token that Bob never has access to.
 
 ---
 
-## 📁 Repository Directory Structure
+## Run State Machine
 
-```text
-AXIS/
-├── apps/
-│   ├── control-center/       # Next.js 15 UI with dark glassmorphism design & Watson Agent
-│   │   ├── app/              # page.tsx (Dashboard), run/page.tsx (Run Inspector)
-│   │   ├── components/       # cost-estimator, brain-feed, watson-agent, stepper ...
-│   │   └── lib/              # typed API client and Server-Sent Events subscriber
-│   ├── orchestrator/         # Hono 4 API, state machine, cryptographic guard, SSE bus
-│   │   ├── src/routes/       # runs, approvals, incidents, watson, demo, events
-│   │   ├── src/lib/          # email (Resend), hash (SHA-256), errors
-│   │   └── src/store/        # Windows-safe JSON evidence store
-│   ├── bob-mcp/              # MCP Server exposing 17 lifecycle tools to IBM Bob
-│   └── demo-service/         # "Nimbus Books" microservice deployed to multi-cloud
-├── packages/
-│   ├── core/                 # Shared Zod schemas, state machine, provider contract
-│   ├── provider-ibm-cloud/   # IBM Cloud adapter (Cloudant, WML, Code Engine)
-│   ├── provider-aws/         # AWS Lambda + Function URL adapter (AWS SDK v3)
-│   └── github/               # Octokit client for Health Sentinel issues & workflows
-├── .bob/                     # IBM Bob custom mode, rules, skills, and MCP config
-│   ├── custom_modes.yaml     # 🛰️ Multi-Cloud DevOps Engineer mode
-│   ├── mcp.json              # MCP Server registration
-│   ├── rules-multicloud-devops/ # 6 strict operational rules
-│   └── skills/               # deployment-asset-authoring, incident-diagnosis
-├── .github/workflows/        # validate.yml (CI), health-sentinel.yml (Cron Prober)
-├── docs/                     # Architecture diagrams, demo scripts, pitch slides, roadmap
-│   ├── architecture/         # System architecture specifications
-│   ├── demo/                 # Verbatim presenter demo script
-│   ├── guide/                # Teammate onboarding guide
-│   └── pitch/                # Hackathon presentation outline
-├── evidence/                 # Verifiable run artifacts and Bob task summary screenshots
-├── scripts/                  # setup/init-dev.ts, demo/golden.ts, demo/api-e2e.ts
-├── setup.ps1                 # One-click Windows setup script
-└── setup.sh                  # One-click macOS/Linux setup script
+```mermaid
+stateDiagram-v2
+  [*] --> created
+  created --> analyzed : Bob records analysis
+  analyzed --> analyzed : re-analysis
+  analyzed --> awaiting_approval : Bob submits plan
+  awaiting_approval --> awaiting_approval : plan resubmitted (old approval supersedes)
+  awaiting_approval --> approved : HUMAN approves in Control Center
+  awaiting_approval --> rejected : HUMAN rejects
+  rejected --> awaiting_approval : revised plan
+  rejected --> analyzed
+  approved --> deploying : execute (hash-checked)
+  deploying --> verifying
+  deploying --> failed
+  verifying --> healthy
+  verifying --> failed
+  verifying --> incident
+  healthy --> verifying : re-verify
+  healthy --> incident : sentinel issue imported
+  failed --> deploying
+  failed --> verifying
+  failed --> incident
+  failed --> awaiting_remediation_approval
+  incident --> incident
+  incident --> awaiting_remediation_approval : Bob proposes remediation
+  awaiting_remediation_approval --> awaiting_remediation_approval
+  awaiting_remediation_approval --> remediating : execute (hash-checked)
+  awaiting_remediation_approval --> incident : HUMAN rejects
+  remediating --> verifying
+  remediating --> failed
 ```
 
 ---
 
-## 🏆 Hackathon Submission Checklist & Artefacts
+## Full Sequence Diagram
 
-- [x] **Core IBM Bob 2.0 Integration**: Custom mode, 6 rules, 2 skills, 3 commands, and 17 MCP bridge tools.
-- [x] **IBM watsonx.ai Integration**: IBM Granite 3-8B model integration for Watson Agent Q&A, incident explanations, and security alert narratives.
-- [x] **Real Multi-Cloud Deployment**: Live AWS Lambda endpoint active and verified with HTTP 200 health; IBM Cloudant state persistence.
-- [x] **Cryptographic Governance**: Hash-bound approvals refusing execution on tampered plans (`403 guard.blocked`).
-- [x] **Automated Self-Healing**: GitHub Health Sentinel detecting faults and Bob restoring services in 7–9 seconds.
-- [x] **Interactive UI Innovation**: Multi-Cloud Cost Estimator with SVG tier breakdown and live streaming agent thought feeds.
-- [x] **Full Test Suite**: 55 unit and lifecycle tests passing; zero TypeScript compilation errors.
-- [x] **Zero-Friction Setup**: One-click onboarding scripts (`setup.ps1`, `setup.sh`, `pnpm onboard`).
+```mermaid
+sequenceDiagram
+  actor Dev as Developer
+  participant Bob as IBM Bob (DevOps mode)
+  participant MCP as bob-mcp (17 tools)
+  participant O as Orchestrator
+  participant UI as Control Center
+  participant IBM as IBM Cloud (Code Engine + Cloudant + watsonx)
+  participant AWS as AWS Lambda
+  participant GH as GitHub Actions / Issues
+
+  Dev->>Bob: /deploy apps/demo-service
+  Bob->>MCP: devops_create_run
+  Bob->>Bob: 4 parallel specialist subagents
+  Bob->>MCP: devops_record_analysis
+  Bob->>MCP: devops_submit_plan
+  MCP->>O: POST /plan - plan hash stored, state: awaiting_approval
+  Bob->>MCP: devops_execute_plan (early - tests the guard)
+  O-->>Bob: 403 guard.blocked (audit event created)
+  Dev->>UI: Review plan hash + architecture rationale - Approve
+  UI->>O: POST /approve (human token)
+  Bob->>MCP: devops_wait(plan_decided)
+  O-->>Bob: approved
+  Bob->>MCP: devops_execute_plan
+  O->>O: TEST (vitest suite)
+  par Parallel cloud deploy
+    O->>IBM: build from source + deploy + verify Cloudant
+    O->>AWS: bundle esbuild + publish version + update alias
+  end
+  O->>IBM: probe /health - 200 OK + revision
+  O->>AWS: probe /health - 200 OK + revision
+  O->>GH: write SENTINEL_TARGETS repo variable
+  Bob->>MCP: devops_verify - export_evidence
+  Dev->>UI: Inject controlled fault (removes CATALOG_MODE)
+  GH->>AWS: probe x 3 - 503 x 3
+  GH->>GH: open GitHub Issue with JSON evidence
+  O->>GH: sync every 60s - import incident - state: incident
+  Dev->>Bob: /investigate
+  Bob->>MCP: devops_sync_incidents - devops_get_incident
+  Bob->>MCP: devops_get_logs
+  Bob->>Bob: reads src/config.ts (CATALOG_MODE reference at line 12)
+  Bob->>MCP: devops_record_diagnosis (evidence: probe body + log line + config.ts:12)
+  Bob->>MCP: devops_propose_remediation(set_env CATALOG_MODE=featured, risk: low)
+  Dev->>UI: Review diagnosis + remediation card - Approve
+  Bob->>MCP: devops_wait(remediation_decided) - devops_execute_remediation
+  O->>AWS: update env CATALOG_MODE=featured
+  O->>AWS: probe /health - 200 OK
+  O->>GH: close issue with recovery comment (MTTR, evidence)
+  Bob->>MCP: devops_export_evidence
+```
 
 ---
 
-<div align="center">
+## Cloud Provider Architecture
 
-### Built with pride for the **IBM Bob 2.0 Hackathon (September 2026)**
-*IBM Bob 2.0 • IBM watsonx.ai • IBM Granite • IBM Cloud • AWS Lambda • Hono • Next.js 15*
+### IBM Cloud — Primary Platform
 
-</div>
+| Component | Service | Role |
+|---|---|---|
+| **Deployment** | Code Engine | Container-based, always-on OR scale-to-zero |
+| **State** | Cloudant NoSQL | Audit records, plan hashes, incident history |
+| **AI** | watsonx.ai WML | IBM Granite 3-8B - Watson Agent inference |
+| **Region** | `us-south` | Primary deployment region |
+
+The IBM Cloud provider adapter uses the `ibmcloud` CLI with the Code Engine plugin. Build-from-source means the repo is shipped directly to Code Engine — no Docker registry required.
+
+### AWS — Second Provider
+
+| Component | Service | Role |
+|---|---|---|
+| **Deployment** | Lambda + Function URL | Serverless, on-demand OR provisioned concurrency |
+| **Bundling** | esbuild | TypeScript to single ESM bundle |
+| **Logs** | CloudWatch Logs | Runtime log retrieval for diagnosis |
+| **Rollback** | Lambda versions + aliases | Instant traffic routing to previous version |
+| **Region** | `us-east-1` | Secondary deployment region |
+
+### Provider Contract
+
+Both providers implement the same interface from [`packages/core/src/provider-contract.ts`](packages/core/src/provider-contract.ts):
+
+```typescript
+interface CloudProvider {
+  deploy(target: PlanTarget, assets: DeploymentAssets): Promise<DeploymentResult>
+  verify(deployment: Deployment): Promise<HealthResult>
+  getLogs(deployment: Deployment, lines: number): Promise<string[]>
+  setEnv(deployment: Deployment, key: string, value: string): Promise<void>
+  rollback(deployment: Deployment, toRevision: string): Promise<void>
+}
+```
+
+---
+
+## GitHub Actions Workflows
+
+### `validate.yml` — Continuous Integration
+Runs on every push and pull request:
+- TypeScript compile check across all packages
+- Full Vitest test suite (55 tests)
+- Build verification
+
+### `health-sentinel.yml` — Independent Health Monitor
+Runs every 5 minutes (GitHub's fastest cron schedule):
+- Reads `SENTINEL_TARGETS` repository variable (set by the orchestrator when a run is deployed)
+- Probes every configured `/health` endpoint
+- Tracks failure count per target
+- Opens a GitHub Issue with machine-readable JSON evidence after 3 consecutive failures
+- The orchestrator imports open issues as incidents within 60 seconds
+
+### `deploy.yml` — Production Deployment
+Human-triggered deployment workflow for production releases.
+
+---
+
+## Troubleshooting
+
+| Issue | Resolution |
+|---|---|
+| **MCP server shows red in Bob** | Run `pnpm build:mcp`, then click the reload icon in Bob's MCP panel. |
+| **Port 3000 or 4000 in use** | `netstat -ano \| findstr :3000` (Windows), kill the listed PID |
+| **`.env` warning on startup** | Ensure `.env` exists in the repo root with at minimum `APPROVAL_TOKEN` set |
+| **Tests failing** | Run `pnpm typecheck` first to catch type errors, then `pnpm test` |
+| **IBM Cloud deploy fails** | Run `pnpm smoke:ibm` — verifies CLI auth and project existence |
+| **AWS deploy fails** | Run `pnpm smoke:aws` — verifies credentials and Lambda role |
+| **Reset a failed demo** | `pnpm demo:reset` wipes state; `pnpm dev` to restart fresh |
+| **Sentinel not triggering** | Manually dispatch the `health-sentinel` workflow from GitHub Actions |
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Version |
+|---|---|---|
+| Runtime | Node.js | 22 LTS |
+| Package manager | pnpm workspaces | 9.15.0 |
+| Language | TypeScript ESM | 5.8 |
+| API framework | Hono | 4 |
+| Validation | Zod | 3.25 |
+| Test runner | Vitest | 3 |
+| Frontend | Next.js + Tailwind | 15 + v4 |
+| AI agent platform | IBM Bob 2.0 | latest |
+| Foundation model | IBM Granite 3-8B | `ibm/granite-3-8b-instruct` |
+| AI platform | IBM watsonx.ai WML | latest |
+| MCP SDK | @modelcontextprotocol/sdk | 1.x |
+| IBM Cloud CLI | ibmcloud + CE plugin | latest |
+| AWS SDK | @aws-sdk v3 | latest |
+| Git integration | Octokit | latest |
+| Process execution | execa | 9 |
+| Bundler | esbuild | latest |
+
+---
+
+## V2 Roadmap
+
+V1 ships real IBM Cloud (Code Engine + Cloudant + watsonx.ai) and AWS Lambda with approval-gated self-healing. V2 adds new provider targets through the same `CloudProvider` contract — zero workflow changes required:
+
+| Package | Target Platform | `deploy` | `setEnv` | `rollback` |
+|---|---|---|---|---|
+| `provider-vercel` | Vercel Deployments API | git push / prebuilt | Project env vars + redeploy | Promote previous deployment |
+| `provider-railway` | Railway GraphQL API | `serviceInstanceDeploy` | `variableUpsert` + redeploy | Redeploy previous |
+| `provider-gcp` | Cloud Run Admin API v2 | container revision | Service env update | Re-route 100% traffic to previous |
+
+Also planned for V2:
+- **AWS Secrets Manager** integration for automatic secret lifecycle
+- **watsonx.ai Multi-Turn Voice Channel** for real-time incident triage
+- **Bob Shell pre-triage comment** on GitHub sentinel issues
+- **Multi-region active-active traffic balancing** across IBM Cloud and AWS
+
+---
+
+## Hackathon Submission Details
+
+**Event:** IBM Bob 2.0 Hackathon — lablab.ai
+**Window:** 48 hours · September 25–27, 2026
+**Deadline:** September 27, 2026, 15:00 UTC
+
+### Judging Criteria Coverage
+
+| Criterion | How AXIS Addresses It |
+|---|---|
+| **Application of Technology** | Custom Bob mode + 6 rules + 2 skills + 3 slash commands + custom MCP server. 4 parallel specialist subagents. Document understanding of incident JSON, logs, PRD, and plan. Bob used to build every phase (evidence committed). |
+| **Originality** | (1) SHA-256 plan hash approval guard. (2) MCP server with no approve tool. (3) Five-label evidence taxonomy. (4) GitHub Issues as cross-cloud incident bus. (5) Single provider contract for IBM Cloud and AWS. |
+| **Business Value** | Control Center displays time from run-created to verified, MTTR, human approvals count, and unsafe actions blocked. Demo frames manual release work (consoles, logs, guesswork) against a single Bob conversation. |
+
+### Submission Artefacts
+- Public GitHub repository (this repo)
+- Slide deck (`docs/pitch/slides-outline.md`)
+- Demo script (`docs/demo/demo-script.md`)
+- Architecture documentation (`docs/architecture/overview.md`)
+- IBM Bob task session evidence (`evidence/bob-task-summaries/`)
+- Exported demo run audit trails (`evidence/demo-runs/`)
+- Custom Bob mode version-controlled (`.bob/custom_modes.yaml`)
+
+---
+
+## Three Sentences
+
+> "Bob is the DevOps engineer, you are the approver, and the orchestrator is the enforcement layer."
+> "Every claim is evidence, and every cloud change is approved."
+> "One provider contract covers IBM Cloud and AWS today, with Vercel and Railway in V2 without touching the workflow."
+
+---
+
+<p align="center">
+  <sub>Built with IBM Bob 2.0 · IBM watsonx.ai · IBM Granite · IBM Cloud Code Engine · AWS Lambda</sub><br>
+  <sub>IBM Bob 2.0 Hackathon · 48 hours · September 2026</sub>
+</p>
