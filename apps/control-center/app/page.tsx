@@ -153,7 +153,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               {runs && runs[0] && (
                 <Link
-                  href={`/run?id=${runs[0].id}`}
+                  href={`/run?id=${runs[0].id}&demo=1`}
                   className="rounded-lg bg-ibm hover:bg-ibm/90 text-white px-3.5 py-1.5 text-xs font-medium transition-colors shadow-sm"
                 >
                   Inspect Latest Run →

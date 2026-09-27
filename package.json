@@ -18,6 +18,7 @@
     "demo:reset": "pnpm --filter @bobops/scripts run demo:reset",
     "demo:golden": "pnpm --filter @bobops/scripts run demo:golden",
     "demo:fault": "pnpm --filter @bobops/scripts run demo:fault",
+    "demo:recover": "tsx scripts/demo/recover.ts",
     "demo:replay": "pnpm --filter @bobops/scripts run demo:replay",
     "init:dev": "tsx scripts/setup/init-dev.ts",
     "onboard": "tsx scripts/setup/init-dev.ts"

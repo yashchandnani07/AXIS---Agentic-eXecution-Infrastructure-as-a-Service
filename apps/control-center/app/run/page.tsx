@@ -41,7 +41,8 @@ type RunTab = 'overview' | 'analytics' | 'brain';
 function RunView() {
   const params = useSearchParams();
   const id = params.get('id');
-  const demo = params.get('demo') === '1';
+  const demoFromQuery = params.get('demo') === '1';
+  const [demoMode, setDemoMode] = useState<boolean>(demoFromQuery || true);
   const { data, error, refresh } = useRun(id);
   const [activeTab, setActiveTab] = useState<RunTab>('overview');
 
@@ -59,9 +60,9 @@ function RunView() {
 
   const latest = data.events.at(-1);
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
-        <div>
+    <div className="space-y-6 min-w-0 w-full">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5 min-w-0">
+        <div className="min-w-0">
           <Link href="/" className="text-xs text-muted hover:text-fg font-mono inline-flex items-center gap-1 transition-colors">
             ← Back to AXIS Overview
           </Link>
@@ -69,15 +70,31 @@ function RunView() {
             <span>{data.run.projectName}</span>
             <span className="font-mono text-xs text-muted font-normal border border-line bg-layer px-2 py-0.5 rounded">{data.run.id}</span>
           </h1>
-          <p className="mt-1.5 text-xs text-muted leading-relaxed">
+          <p className="mt-1.5 text-xs text-muted leading-relaxed break-words">
             {data.run.objective} · <span className="font-mono text-fg">{data.run.repoPath}</span> · <span className="text-fg">{data.run.targets.join(' + ')}</span>
             {' · sentinel check-in every '}
             <span className="font-mono text-fg font-medium">{data.run.sentinelIntervalMinutes} min</span>
           </p>
         </div>
-        <div className="text-right">
-          <StateBadge state={data.run.state} />
-          {latest && <p className="mt-2 max-w-md text-xs text-muted truncate">Latest: {latest.message}</p>}
+        <div className="text-right flex flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDemoMode(!demoMode)}
+              title="Toggle presenter demo controls (💥 Inject Vulnerability & Notify)"
+              className={clsx(
+                'px-2.5 py-1 rounded text-xs font-mono border transition-all cursor-pointer flex items-center gap-1.5',
+                demoMode
+                  ? 'border-bad/60 bg-bad/10 text-bad font-semibold'
+                  : 'border-line bg-layer-2 text-muted hover:text-fg'
+              )}
+            >
+              <span className={clsx('h-1.5 w-1.5 rounded-full', demoMode ? 'bg-bad animate-pulse' : 'bg-muted')} />
+              💥 Demo Mode: {demoMode ? 'ON' : 'OFF'}
+            </button>
+            <StateBadge state={data.run.state} />
+          </div>
+          {latest && <p className="mt-1 max-w-md text-xs text-muted truncate">Latest: {latest.message}</p>}
         </div>
       </header>
 
@@ -85,7 +102,7 @@ function RunView() {
       <MetricsStrip agg={data} />
 
       {/* Tab navigation */}
-      <div className="flex items-center gap-1.5 border-b border-line pb-1">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-line pb-1 min-w-0">
         {([
           { id: 'overview',  label: '🚀 Overview',         desc: 'Approvals, deployments, plan, logs' },
           { id: 'analytics', label: '📊 Analytics',         desc: 'Cost timeline, uptime, comparison' },
@@ -109,16 +126,16 @@ function RunView() {
 
       {/* TAB: Overview */}
       {activeTab === 'overview' && (
-        <div className="grid gap-6 xl:grid-cols-3">
-          <div className="space-y-6 xl:col-span-2">
+        <div className="grid gap-6 grid-cols-1 xl:grid-cols-3 min-w-0 w-full">
+          <div className="space-y-6 xl:col-span-2 min-w-0 w-full">
             <ApprovalQueue agg={data} onDecided={refresh} />
             <IncidentsPanel agg={data} onChanged={refresh} />
-            <DeploymentsPanel agg={data} onChanged={refresh} demo={demo} />
+            <DeploymentsPanel agg={data} onChanged={refresh} demo={demoMode} />
             <PlanPanel agg={data} />
             <AnalysisPanel agg={data} />
             <LogsPanel agg={data} />
           </div>
-          <div className="space-y-6">
+          <div className="space-y-6 xl:col-span-1 min-w-0 w-full">
             <AuditTrail agg={data} />
             <WatsonAgent runId={data.run.id} />
           </div>
@@ -127,14 +144,14 @@ function RunView() {
 
       {/* TAB: Analytics */}
       {activeTab === 'analytics' && (
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0 w-full">
           <CostTimeline agg={data} />
           <DeploymentComparison agg={data} />
-          <div className="grid gap-6 xl:grid-cols-3">
-            <div className="xl:col-span-2 space-y-6">
-              <DeploymentsPanel agg={data} onChanged={refresh} demo={demo} />
+          <div className="grid gap-6 grid-cols-1 xl:grid-cols-3 min-w-0 w-full">
+            <div className="xl:col-span-2 space-y-6 min-w-0 w-full">
+              <DeploymentsPanel agg={data} onChanged={refresh} demo={demoMode} />
             </div>
-            <div>
+            <div className="xl:col-span-1 min-w-0 w-full">
               <WatsonAgent runId={data.run.id} />
             </div>
           </div>

@@ -27,6 +27,14 @@ export function ApprovalQueue({ agg, onDecided }: { agg: RunAggregate; onDecided
     setError(null);
     try {
       await api.decide(id, decision, comment || undefined);
+      // If this was a remediation approval, also execute the remediation to complete self-healing!
+      const targetApproval = pending.find((a) => a.id === id);
+      if (decision === 'approved' && targetApproval?.kind === 'remediation') {
+        const incident = agg.incidents.find((i) => i.remediation?.approvalId === id);
+        if (incident) {
+          await api.executeRemediation(incident.id);
+        }
+      }
       setComment('');
       onDecided();
     } catch (err) {
@@ -60,14 +68,16 @@ export function ApprovalQueue({ agg, onDecided }: { agg: RunAggregate; onDecided
             <button
               onClick={() => decide(a.id, 'approved')}
               disabled={busy !== null || MODE === 'replay'}
-              className="rounded bg-ibm px-4 py-2 text-sm font-medium text-white hover:bg-ibm/90 active:bg-ibm/80 disabled:opacity-50 transition-colors shadow-sm"
+              className="rounded bg-ibm px-4 py-2 text-sm font-medium text-white hover:bg-ibm/90 active:bg-ibm/80 disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
             >
-              {busy === a.id + 'approved' ? 'Approving…' : 'Approve Plan'}
+              {busy === a.id + 'approved'
+                ? (a.kind === 'remediation' ? 'Applying remediation & restoring…' : 'Approving…')
+                : (a.kind === 'remediation' ? '⚡ Approve & Restore Service' : 'Approve Plan')}
             </button>
             <button
               onClick={() => decide(a.id, 'rejected')}
               disabled={busy !== null || MODE === 'replay'}
-              className="rounded border border-line-strong px-4 py-2 text-sm font-medium text-fg hover:border-bad hover:text-bad active:bg-bad/5 disabled:opacity-50 transition-colors"
+              className="rounded border border-line-strong px-4 py-2 text-sm font-medium text-fg hover:border-bad hover:text-bad active:bg-bad/5 disabled:opacity-50 transition-colors cursor-pointer"
             >
               Reject
             </button>

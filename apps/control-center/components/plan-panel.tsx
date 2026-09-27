@@ -22,17 +22,17 @@ export function PlanPanel({ agg }: { agg: RunAggregate }) {
       subtitle={plan.summary}
       right={<span className="font-mono text-[11px] text-muted">sha256 {agg.run.planHash?.slice(0, 12)}…</span>}
     >
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 min-w-0">
         {plan.targets.map((t) => {
           const chosen = describeService(t.service);
           const alternative = servicesForProvider(t.provider).find((s) => s.service !== t.service);
           return (
-            <div key={t.provider} className="rounded-lg border border-line bg-canvas p-4">
+            <div key={t.provider} className="rounded-lg border border-line bg-canvas p-4 min-w-0 overflow-hidden">
               <div className="flex items-center justify-between">
                 <ProviderBadge provider={t.provider} />
                 <span className="font-mono text-xs text-muted">{t.region}</span>
               </div>
-              <p className="mt-2 font-mono text-sm font-semibold text-fg">{t.appName}</p>
+              <p className="mt-2 font-mono text-sm font-semibold text-fg truncate">{t.appName}</p>
               <div className="mt-3 flex items-center gap-2">
                 <span
                   className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${chosen.kind === 'warm' ? 'bg-ok/15 text-ok border border-ok/30' : 'bg-info/15 text-info border border-info/30'}`}
@@ -41,34 +41,36 @@ export function PlanPanel({ agg }: { agg: RunAggregate }) {
                 </span>
                 <span className="text-xs font-semibold text-fg">{chosen.label}</span>
               </div>
-              <p className="mt-2.5 rounded border border-bob/30 bg-bob/5 p-2.5 text-xs leading-relaxed text-fg">
+              <p className="mt-2.5 rounded border border-bob/30 bg-bob/5 p-2.5 text-xs leading-relaxed text-fg break-words">
                 <span className="font-semibold text-bob">Why this architecture: </span>
                 {t.architectureRationale}
               </p>
               {alternative && (
-                <p className="mt-1.5 text-[10px] text-muted">
+                <p className="mt-1.5 text-[10px] text-muted break-words">
                   Not chosen: <span className="font-mono text-fg">{alternative.label}</span> — {alternative.description}
                 </p>
               )}
-              <table className="mt-3 w-full text-xs">
-                <tbody>
-                  {t.resources.map((r) => (
-                    <tr key={r.type + r.name} className="border-t border-line/60">
-                      <td className="py-1 pr-2 text-muted uppercase text-[10px] font-mono">{r.action}</td>
-                      <td className="py-1 pr-2 text-fg">{r.type}</td>
-                      <td className="py-1 font-mono text-muted">{r.name}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-3.5 flex flex-wrap gap-1.5 border-t border-line/60 pt-2.5">
+              <div className="overflow-x-auto min-w-0">
+                <table className="mt-3 w-full text-xs">
+                  <tbody>
+                    {t.resources.map((r) => (
+                      <tr key={r.type + r.name} className="border-t border-line/60">
+                        <td className="py-1 pr-2 text-muted uppercase text-[10px] font-mono">{r.action}</td>
+                        <td className="py-1 pr-2 text-fg truncate">{r.type}</td>
+                        <td className="py-1 font-mono text-muted truncate">{r.name}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3.5 flex flex-wrap gap-1.5 border-t border-line/60 pt-2.5 min-w-0">
                 {Object.entries(t.env).map(([k, v]) => (
-                  <span key={k} className="rounded border border-line bg-layer-2 px-2 py-0.5 font-mono text-[10px] text-fg">
+                  <span key={k} className="rounded border border-line bg-layer-2 px-2 py-0.5 font-mono text-[10px] text-fg break-all">
                     {k}={v}
                   </span>
                 ))}
                 {t.secretRefs.map((s) => (
-                  <span key={s} className="rounded border border-bob/30 bg-bob/15 px-2 py-0.5 font-mono text-[10px] text-bob">
+                  <span key={s} className="rounded border border-bob/30 bg-bob/15 px-2 py-0.5 font-mono text-[10px] text-bob break-all">
                     🔒 {s}
                   </span>
                 ))}
@@ -77,12 +79,12 @@ export function PlanPanel({ agg }: { agg: RunAggregate }) {
           );
         })}
       </div>
-      <div className="mt-5 grid gap-6 text-sm md:grid-cols-3 border-t border-line pt-4">
-        <div>
+      <div className="mt-5 grid gap-6 text-sm grid-cols-1 md:grid-cols-3 border-t border-line pt-4 min-w-0">
+        <div className="min-w-0">
           <h3 className="text-[10px] uppercase tracking-wider text-muted font-medium">Assessed Risks</h3>
           <ul className="mt-2 space-y-2">
             {plan.risks.map((r) => (
-              <li key={r.id} className="text-xs">
+              <li key={r.id} className="text-xs break-words">
                 <SeverityDot severity={r.severity} />
                 <span className="font-medium text-fg">{r.title}</span>
                 <p className="mt-0.5 text-[11px] text-muted pl-3.5">↳ {r.mitigation}</p>
@@ -90,17 +92,17 @@ export function PlanPanel({ agg }: { agg: RunAggregate }) {
             ))}
           </ul>
         </div>
-        <div>
+        <div className="min-w-0">
           <h3 className="text-[10px] uppercase tracking-wider text-muted font-medium">Generated by Bob</h3>
           <ul className="mt-2 space-y-1.5 text-xs">
             {plan.generatedAssets.map((a) => (
-              <li key={a.path}>
-                <span className="font-mono text-ibm-soft">{a.path}</span> <span className="text-muted">— {a.purpose}</span>
+              <li key={a.path} className="break-words">
+                <span className="font-mono text-ibm-soft break-all">{a.path}</span> <span className="text-muted">— {a.purpose}</span>
               </li>
             ))}
           </ul>
         </div>
-        <div>
+        <div className="min-w-0 break-words">
           <h3 className="text-[10px] uppercase tracking-wider text-muted font-medium">Rollback &amp; Gates</h3>
           <p className="mt-2 text-xs text-fg">{plan.rollbackStrategy}</p>
           <ul className="mt-2 list-disc pl-4 text-xs text-warn">

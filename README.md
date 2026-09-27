@@ -745,3 +745,257 @@ Also planned for V2:
   <sub>Built with IBM Bob 2.0 · IBM watsonx.ai · IBM Granite · IBM Cloud Code Engine · AWS Lambda</sub><br>
   <sub>IBM Bob 2.0 Hackathon · 48 hours · September 2026</sub>
 </p>
+| `devops_get_incident` | RECOVER | Full incident evidence (probe bodies, logs) |
+| `devops_record_diagnosis` | RECOVER | Record evidence-backed root cause |
+| `devops_propose_remediation` | RECOVER | Propose `set_env` or `rollback` (opens approval gate) |
+| `devops_execute_remediation` | RECOVER | Execute *approved* remediation + re-verify |
+| `devops_export_evidence` | COMPLETE | Write audit trail to `evidence/demo-runs/` |
+
+> **There is no `devops_approve` tool.** This is intentional. The approve action lives in the Control Center and requires a token that Bob never has access to.
+
+---
+
+## Run State Machine
+
+```mermaid
+stateDiagram-v2
+  [*] --> created
+  created --> analyzed : Bob records analysis
+  analyzed --> analyzed : re-analysis
+  analyzed --> awaiting_approval : Bob submits plan
+  awaiting_approval --> awaiting_approval : plan resubmitted (old approval supersedes)
+  awaiting_approval --> approved : HUMAN approves in Control Center
+  awaiting_approval --> rejected : HUMAN rejects
+  rejected --> awaiting_approval : revised plan
+  rejected --> analyzed
+  approved --> deploying : execute (hash-checked)
+  deploying --> verifying
+  deploying --> failed
+  verifying --> healthy
+  verifying --> failed
+  verifying --> incident
+  healthy --> verifying : re-verify
+  healthy --> incident : sentinel issue imported
+  failed --> deploying
+  failed --> verifying
+  failed --> incident
+  failed --> awaiting_remediation_approval
+  incident --> incident
+  incident --> awaiting_remediation_approval : Bob proposes remediation
+  awaiting_remediation_approval --> awaiting_remediation_approval
+  awaiting_remediation_approval --> remediating : execute (hash-checked)
+  awaiting_remediation_approval --> incident : HUMAN rejects
+  remediating --> verifying
+  remediating --> failed
+```
+
+---
+
+## Full Sequence Diagram
+
+```mermaid
+sequenceDiagram
+  actor Dev as Developer
+  participant Bob as IBM Bob (DevOps mode)
+  participant MCP as bob-mcp (17 tools)
+  participant O as Orchestrator
+  participant UI as Control Center
+  participant IBM as IBM Cloud (Code Engine + Cloudant + watsonx)
+  participant AWS as AWS Lambda
+  participant GH as GitHub Actions / Issues
+
+  Dev->>Bob: /deploy apps/demo-service
+  Bob->>MCP: devops_create_run
+  Bob->>Bob: 4 parallel specialist subagents
+  Bob->>MCP: devops_record_analysis
+  Bob->>MCP: devops_submit_plan
+  MCP->>O: POST /plan - plan hash stored, state: awaiting_approval
+  Bob->>MCP: devops_execute_plan (early - tests the guard)
+  O-->>Bob: 403 guard.blocked (audit event created)
+  Dev->>UI: Review plan hash + architecture rationale - Approve
+  UI->>O: POST /approve (human token)
+  Bob->>MCP: devops_wait(plan_decided)
+  O-->>Bob: approved
+  Bob->>MCP: devops_execute_plan
+  O->>O: TEST (vitest suite)
+  par Parallel cloud deploy
+    O->>IBM: build from source + deploy + verify Cloudant
+    O->>AWS: bundle esbuild + publish version + update alias
+  end
+  O->>IBM: probe /health - 200 OK + revision
+  O->>AWS: probe /health - 200 OK + revision
+  O->>GH: write SENTINEL_TARGETS repo variable
+  Bob->>MCP: devops_verify - export_evidence
+  Dev->>UI: Inject controlled fault (removes CATALOG_MODE)
+  GH->>AWS: probe x 3 - 503 x 3
+  GH->>GH: open GitHub Issue with JSON evidence
+  O->>GH: sync every 60s - import incident - state: incident
+  Dev->>Bob: /investigate
+  Bob->>MCP: devops_sync_incidents - devops_get_incident
+  Bob->>MCP: devops_get_logs
+  Bob->>Bob: reads src/config.ts (CATALOG_MODE reference at line 12)
+  Bob->>MCP: devops_record_diagnosis (evidence: probe body + log line + config.ts:12)
+  Bob->>MCP: devops_propose_remediation(set_env CATALOG_MODE=featured, risk: low)
+  Dev->>UI: Review diagnosis + remediation card - Approve
+  Bob->>MCP: devops_wait(remediation_decided) - devops_execute_remediation
+  O->>AWS: update env CATALOG_MODE=featured
+  O->>AWS: probe /health - 200 OK
+  O->>GH: close issue with recovery comment (MTTR, evidence)
+  Bob->>MCP: devops_export_evidence
+```
+
+---
+
+## Cloud Provider Architecture
+
+### IBM Cloud — Primary Platform
+
+| Component | Service | Role |
+|---|---|---|
+| **Deployment** | Code Engine | Container-based, always-on OR scale-to-zero |
+| **State** | Cloudant NoSQL | Audit records, plan hashes, incident history |
+| **AI** | watsonx.ai WML | IBM Granite 3-8B - Watson Agent inference |
+| **Region** | `us-south` | Primary deployment region |
+
+The IBM Cloud provider adapter uses the `ibmcloud` CLI with the Code Engine plugin. Build-from-source means the repo is shipped directly to Code Engine — no Docker registry required.
+
+### AWS — Second Provider
+
+| Component | Service | Role |
+|---|---|---|
+| **Deployment** | Lambda + Function URL | Serverless, on-demand OR provisioned concurrency |
+| **Bundling** | esbuild | TypeScript to single ESM bundle |
+| **Logs** | CloudWatch Logs | Runtime log retrieval for diagnosis |
+| **Rollback** | Lambda versions + aliases | Instant traffic routing to previous version |
+| **Region** | `us-east-1` | Secondary deployment region |
+
+### Provider Contract
+
+Both providers implement the same interface from [`packages/core/src/provider-contract.ts`](packages/core/src/provider-contract.ts):
+
+```typescript
+interface CloudProvider {
+  deploy(target: PlanTarget, assets: DeploymentAssets): Promise<DeploymentResult>
+  verify(deployment: Deployment): Promise<HealthResult>
+  getLogs(deployment: Deployment, lines: number): Promise<string[]>
+  setEnv(deployment: Deployment, key: string, value: string): Promise<void>
+  rollback(deployment: Deployment, toRevision: string): Promise<void>
+}
+```
+
+---
+
+## GitHub Actions Workflows
+
+### `validate.yml` — Continuous Integration
+Runs on every push and pull request:
+- TypeScript compile check across all packages
+- Full Vitest test suite (55 tests)
+- Build verification
+
+### `health-sentinel.yml` — Independent Health Monitor
+Runs every 5 minutes (GitHub's fastest cron schedule):
+- Reads `SENTINEL_TARGETS` repository variable (set by the orchestrator when a run is deployed)
+- Probes every configured `/health` endpoint
+- Tracks failure count per target
+- Opens a GitHub Issue with machine-readable JSON evidence after 3 consecutive failures
+- The orchestrator imports open issues as incidents within 60 seconds
+
+### `deploy.yml` — Production Deployment
+Human-triggered deployment workflow for production releases.
+
+---
+
+## Troubleshooting
+
+| Issue | Resolution |
+|---|---|
+| **MCP server shows red in Bob** | Run `pnpm build:mcp`, then click the reload icon in Bob's MCP panel. |
+| **Port 3000 or 4000 in use** | `netstat -ano \| findstr :3000` (Windows), kill the listed PID |
+| **`.env` warning on startup** | Ensure `.env` exists in the repo root with at minimum `APPROVAL_TOKEN` set |
+| **Tests failing** | Run `pnpm typecheck` first to catch type errors, then `pnpm test` |
+| **IBM Cloud deploy fails** | Run `pnpm smoke:ibm` — verifies CLI auth and project existence |
+| **AWS deploy fails** | Run `pnpm smoke:aws` — verifies credentials and Lambda role |
+| **Reset a failed demo** | `pnpm demo:reset` wipes state; `pnpm dev` to restart fresh |
+| **Sentinel not triggering** | Manually dispatch the `health-sentinel` workflow from GitHub Actions |
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Version |
+|---|---|---|
+| Runtime | Node.js | 22 LTS |
+| Package manager | pnpm workspaces | 9.15.0 |
+| Language | TypeScript ESM | 5.8 |
+| API framework | Hono | 4 |
+| Validation | Zod | 3.25 |
+| Test runner | Vitest | 3 |
+| Frontend | Next.js + Tailwind | 15 + v4 |
+| AI agent platform | IBM Bob 2.0 | latest |
+| Foundation model | IBM Granite 3-8B | `ibm/granite-3-8b-instruct` |
+| AI platform | IBM watsonx.ai WML | latest |
+| MCP SDK | @modelcontextprotocol/sdk | 1.x |
+| IBM Cloud CLI | ibmcloud + CE plugin | latest |
+| AWS SDK | @aws-sdk v3 | latest |
+| Git integration | Octokit | latest |
+| Process execution | execa | 9 |
+| Bundler | esbuild | latest |
+
+---
+
+## V2 Roadmap
+
+V1 ships real IBM Cloud (Code Engine + Cloudant + watsonx.ai) and AWS Lambda with approval-gated self-healing. V2 adds new provider targets through the same `CloudProvider` contract — zero workflow changes required:
+
+| Package | Target Platform | `deploy` | `setEnv` | `rollback` |
+|---|---|---|---|---|
+| `provider-vercel` | Vercel Deployments API | git push / prebuilt | Project env vars + redeploy | Promote previous deployment |
+| `provider-railway` | Railway GraphQL API | `serviceInstanceDeploy` | `variableUpsert` + redeploy | Redeploy previous |
+| `provider-gcp` | Cloud Run Admin API v2 | container revision | Service env update | Re-route 100% traffic to previous |
+
+Also planned for V2:
+- **AWS Secrets Manager** integration for automatic secret lifecycle
+- **watsonx.ai Multi-Turn Voice Channel** for real-time incident triage
+- **Bob Shell pre-triage comment** on GitHub sentinel issues
+- **Multi-region active-active traffic balancing** across IBM Cloud and AWS
+
+---
+
+## Hackathon Submission Details
+
+**Event:** IBM Bob 2.0 Hackathon — lablab.ai
+**Window:** 48 hours · September 25–27, 2026
+**Deadline:** September 27, 2026, 15:00 UTC
+
+### Judging Criteria Coverage
+
+| Criterion | How AXIS Addresses It |
+|---|---|
+| **Application of Technology** | Custom Bob mode + 6 rules + 2 skills + 3 slash commands + custom MCP server. 4 parallel specialist subagents. Document understanding of incident JSON, logs, PRD, and plan. Bob used to build every phase (evidence committed). |
+| **Originality** | (1) SHA-256 plan hash approval guard. (2) MCP server with no approve tool. (3) Five-label evidence taxonomy. (4) GitHub Issues as cross-cloud incident bus. (5) Single provider contract for IBM Cloud and AWS. |
+| **Business Value** | Control Center displays time from run-created to verified, MTTR, human approvals count, and unsafe actions blocked. Demo frames manual release work (consoles, logs, guesswork) against a single Bob conversation. |
+
+### Submission Artefacts
+- Public GitHub repository (this repo)
+- Slide deck (`docs/pitch/slides-outline.md`)
+- Demo script (`docs/demo/demo-script.md`)
+- Architecture documentation (`docs/architecture/overview.md`)
+- IBM Bob task session evidence (`evidence/bob-task-summaries/`)
+- Exported demo run audit trails (`evidence/demo-runs/`)
+- Custom Bob mode version-controlled (`.bob/custom_modes.yaml`)
+
+---
+
+## Three Sentences
+
+> "Bob is the DevOps engineer, you are the approver, and the orchestrator is the enforcement layer."
+> "Every claim is evidence, and every cloud change is approved."
+> "One provider contract covers IBM Cloud and AWS today, with Vercel and Railway in V2 without touching the workflow."
+
+---
+
+<p align="center">
+  <sub>Built with IBM Bob 2.0 · IBM watsonx.ai · IBM Granite · IBM Cloud Code Engine · AWS Lambda</sub><br>
+  <sub>IBM Bob 2.0 Hackathon · 48 hours · September 2026</sub>
+</p>

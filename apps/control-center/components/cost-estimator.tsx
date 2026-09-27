@@ -31,54 +31,61 @@ interface BarEntry {
 function SvgTierChart({ bars, max }: { bars: BarEntry[]; max: number }) {
   const W = 420;
   const rowH = 34;
-  const labelW = 190;
-  const barAreaW = W - labelW - 70;
+  const labelW = 180;
+  const barAreaW = W - labelW - 75;
   const H = bars.length * rowH + 16;
   const minCost = Math.min(...bars.map((x) => x.cost));
 
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block w-full">
-      {bars.map((b, i) => {
-        const barW = max > 0 ? Math.max(3, (b.cost / max) * barAreaW) : 3;
-        const y = i * rowH + 8;
-        const isCheapest = b.cost === minCost;
-        return (
-          <g key={b.tierKey}>
-            {/* Label */}
-            <text x={12} y={y + 14} fontSize={10} fill="#94a3b8" fontFamily="IBM Plex Mono, monospace">
-              {b.label.length > 27 ? b.label.slice(0, 25) + '…' : b.label}
-            </text>
-            {/* Kind dot */}
-            <circle
-              cx={4}
-              cy={y + 11}
-              r={3}
-              fill={b.kind === 'warm' ? '#22c55e' : '#38bdf8'}
-              opacity={0.85}
-            />
-            {/* Bar */}
-            <rect x={labelW} y={y + 2} width={barW} height={18} rx={3} fill={b.color} opacity={0.8} />
-            {/* Cost label */}
-            <text
-              x={labelW + barW + 6}
-              y={y + 15}
-              fontSize={10.5}
-              fontFamily="IBM Plex Mono, monospace"
-              fontWeight="600"
-              fill={b.color}
-            >
-              ${b.cost < 0.01 ? '<0.01' : b.cost.toFixed(2)}/mo
-            </text>
-            {/* Cheapest badge */}
-            {isCheapest && (
-              <text x={labelW + barW + 60} y={y + 15} fontSize={8.5} fill="#22c55e" fontFamily="IBM Plex Mono, monospace">
-                ← best
+    <div className="w-full overflow-x-auto min-w-0 py-1">
+      <svg
+        width="100%"
+        viewBox={`0 0 ${W} ${H}`}
+        className="block w-full min-w-[340px] max-w-full"
+        preserveAspectRatio="xMinYMid meet"
+      >
+        {bars.map((b, i) => {
+          const barW = max > 0 ? Math.max(3, (b.cost / max) * barAreaW) : 3;
+          const y = i * rowH + 8;
+          const isCheapest = b.cost === minCost;
+          return (
+            <g key={b.tierKey}>
+              {/* Label */}
+              <text x={12} y={y + 14} fontSize={10} fill="#94a3b8" fontFamily="IBM Plex Mono, monospace">
+                {b.label.length > 25 ? b.label.slice(0, 23) + '…' : b.label}
               </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+              {/* Kind dot */}
+              <circle
+                cx={4}
+                cy={y + 11}
+                r={3}
+                fill={b.kind === 'warm' ? '#22c55e' : '#38bdf8'}
+                opacity={0.85}
+              />
+              {/* Bar */}
+              <rect x={labelW} y={y + 2} width={barW} height={18} rx={3} fill={b.color} opacity={0.8} />
+              {/* Cost label */}
+              <text
+                x={labelW + barW + 6}
+                y={y + 15}
+                fontSize={10.5}
+                fontFamily="IBM Plex Mono, monospace"
+                fontWeight="600"
+                fill={b.color}
+              >
+                ${b.cost < 0.01 ? '<0.01' : b.cost.toFixed(2)}/mo
+              </text>
+              {/* Cheapest badge */}
+              {isCheapest && (
+                <text x={labelW + barW + 60} y={y + 15} fontSize={8.5} fill="#22c55e" fontFamily="IBM Plex Mono, monospace">
+                  ← best
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 
@@ -188,9 +195,9 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
   const maxTierCost = Math.max(...tierBars.map((b) => b.cost), 0.01);
 
   return (
-    <div className={clsx('rounded-xl border border-line bg-canvas/80 p-5 shadow-sm', plan ? 'mt-5' : 'space-y-6')}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3.5">
-        <div className="flex flex-wrap items-center gap-2.5">
+    <div className={clsx('rounded-xl border border-line bg-canvas/80 p-5 shadow-sm w-full max-w-full min-w-0 overflow-hidden', plan ? 'mt-5' : 'space-y-6')}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3.5 min-w-0">
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
           <span className="text-sm font-semibold text-fg flex items-center gap-1.5">
             <span>💰</span> Multi-Cloud Cost Estimator
           </span>
@@ -201,18 +208,18 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
             IBM Cloud + AWS
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => setShowTierBreakdown(!showTierBreakdown)}
-            className="text-[11px] font-mono text-muted hover:text-fg transition-colors"
+            className="text-[11px] font-mono text-muted hover:text-fg transition-colors cursor-pointer"
           >
             {showTierBreakdown ? 'Hide SVG Chart ▲' : 'Show SVG Chart ▼'}
           </button>
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className="font-mono text-xs text-muted hover:text-fg transition-colors"
+            className="font-mono text-xs text-muted hover:text-fg transition-colors cursor-pointer"
           >
             {isOpen ? 'Collapse Controls ▲' : 'Expand Controls ▼'}
           </button>
@@ -220,10 +227,10 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
       </div>
 
       {isOpen && (
-        <div className="mt-4 space-y-5">
+        <div className="mt-4 space-y-5 min-w-0">
           {/* Sliders & Parameters */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-3 min-w-0">
+            <div className="min-w-0">
               <label htmlFor={reqSliderId} className="flex justify-between text-xs text-muted">
                 <span>Monthly Invocations</span>
                 <span className="font-mono font-medium text-fg">{formatNumber(monthlyRequests)} req</span>
@@ -245,7 +252,7 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
               </div>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <label htmlFor={durSliderId} className="flex justify-between text-xs text-muted">
                 <span>Avg Duration</span>
                 <span className="font-mono font-medium text-fg">{avgDurationMs} ms</span>
@@ -267,7 +274,7 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
               </div>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <label htmlFor={memSelectId} className="flex justify-between text-xs text-muted">
                 <span>Memory Allocation</span>
                 <span className="font-mono font-medium text-fg">{memoryMb} MB</span>
@@ -289,14 +296,14 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
           </div>
 
           {/* Architecture Variant Toggles */}
-          <div className="grid gap-3 pt-1 sm:grid-cols-2">
-            <div className="rounded-lg border border-line bg-layer p-3.5">
-              <div className="flex items-center justify-between">
+          <div className="grid gap-3 pt-1 grid-cols-1 md:grid-cols-2 min-w-0">
+            <div className="rounded-lg border border-line bg-layer p-3.5 min-w-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-ibm-soft">IBM Code Engine Architecture</span>
                 <button
                   type="button"
                   onClick={() => setIbmScaleToZero(!ibmScaleToZero)}
-                  className={`rounded px-2.5 py-1 font-mono text-[10px] font-semibold transition-colors ${
+                  className={`rounded px-2.5 py-1 font-mono text-[10px] font-semibold transition-colors cursor-pointer ${
                     ibmScaleToZero ? 'bg-info/20 text-info border border-info/40' : 'bg-ok/20 text-ok border border-ok/40'
                   }`}
                 >
@@ -310,13 +317,13 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
               </p>
             </div>
 
-            <div className="rounded-lg border border-line bg-layer p-3.5">
-              <div className="flex items-center justify-between">
+            <div className="rounded-lg border border-line bg-layer p-3.5 min-w-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-aws">AWS Lambda Architecture</span>
                 <button
                   type="button"
                   onClick={() => setAwsProvisioned(!awsProvisioned)}
-                  className={`rounded px-2.5 py-1 font-mono text-[10px] font-semibold transition-colors ${
+                  className={`rounded px-2.5 py-1 font-mono text-[10px] font-semibold transition-colors cursor-pointer ${
                     !awsProvisioned ? 'bg-info/20 text-info border border-info/40' : 'bg-ok/20 text-ok border border-ok/40'
                   }`}
                 >
@@ -332,8 +339,8 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
           </div>
 
           {/* Cost Output Cards */}
-          <div className="grid gap-3.5 pt-1 sm:grid-cols-3">
-            <div className="rounded-xl border border-ibm/40 bg-ibm/5 p-4 transition-all">
+          <div className="grid gap-3.5 pt-1 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
+            <div className="rounded-xl border border-ibm/40 bg-ibm/5 p-4 transition-all min-w-0">
               <p className="text-[11px] font-medium text-ibm-soft">IBM Cloud Code Engine</p>
               <p className="mt-1 font-mono text-xl font-bold text-fg">
                 ${ibmTotalMonthly.toFixed(2)}
@@ -344,7 +351,7 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
               </p>
             </div>
 
-            <div className="rounded-xl border border-aws/40 bg-aws/5 p-4 transition-all">
+            <div className="rounded-xl border border-aws/40 bg-aws/5 p-4 transition-all min-w-0">
               <p className="text-[11px] font-medium text-aws">AWS Lambda + Function URL</p>
               <p className="mt-1 font-mono text-xl font-bold text-fg">
                 ${awsTotalMonthly.toFixed(2)}
@@ -355,7 +362,7 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
               </p>
             </div>
 
-            <div className="rounded-xl border border-ok/40 bg-ok/5 p-4 transition-all">
+            <div className="rounded-xl border border-ok/40 bg-ok/5 p-4 transition-all min-w-0 sm:col-span-2 lg:col-span-1">
               <p className="text-[11px] font-medium text-ok">Total Dual-Cloud Deployment</p>
               <p className="mt-1 font-mono text-2xl font-bold text-fg">
                 ${totalCombinedMonthly.toFixed(2)}
@@ -369,12 +376,12 @@ export function CostEstimator({ plan }: CostEstimatorProps) {
 
           {/* SVG Tier Breakdown Visualization */}
           {showTierBreakdown && (
-            <div className="rounded-xl border border-line bg-layer/60 p-4">
-              <div className="flex items-center justify-between mb-3">
+            <div className="rounded-xl border border-line bg-layer/60 p-4 w-full min-w-0 overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3 min-w-0">
                 <span className="text-[11px] uppercase tracking-wider text-muted font-mono font-medium">
                   Architecture Tier Comparison (Live Model)
                 </span>
-                <div className="flex items-center gap-3 text-[10px] font-mono text-muted">
+                <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono text-muted">
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-ok" /> Always warm</span>
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-info" /> Cost-optimized</span>
                 </div>

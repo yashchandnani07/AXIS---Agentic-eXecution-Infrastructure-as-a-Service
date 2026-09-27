@@ -3,10 +3,10 @@
  * @phase     P11 (extended P11+)
  * @owner     Product & Experience
  * @purpose   DEPLOY + VERIFY view: live endpoint per cloud, revision, HTTP health + latency, re-verify,
- *            and the 💥 "Inject Vulnerability & Notify" demo control that triggers fault injection,
+ *           ggers fault injection,
  *            AI analysis via IBM Granite, and a Resend incident email — all in one button press.
  * @depends   react, clsx, @bobops/core, @/lib/api, ./ui
- * @usedBy    app/run/page.tsx
+ * @usedBy    app/run/page.tsx and the 💥 "Inject Vulnerability & Notify" demo control that tri
  * @agentNotes The collapse button only renders with ?demo=1 in LIVE mode (presenter control, human token).
  *             The result card stays visible until the next action so judges can read the email content.
  */
@@ -72,12 +72,12 @@ export function DeploymentsPanel({ agg, onChanged, demo }: { agg: RunAggregate; 
         ) : undefined
       }
     >
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 min-w-0">
         {[...latest.values()].map((d) => {
           const h = health.get(d.provider);
           const isCollapsing = busy === `collapse-${d.provider}`;
           return (
-            <div key={d.provider} className={clsx('rounded-lg border bg-canvas p-4', h ? (h.ok ? 'border-ok/50' : 'border-bad/80 bg-bad/5') : 'border-line')}>
+            <div key={d.provider} className={clsx('rounded-lg border bg-canvas p-4 min-w-0 overflow-hidden', h ? (h.ok ? 'border-ok/50' : 'border-bad/80 bg-bad/5') : 'border-line')}>
               <div className="flex items-center justify-between">
                 <ProviderBadge provider={d.provider} />
                 <span className={clsx('font-mono text-xs uppercase font-medium', d.status === 'succeeded' ? 'text-ok' : d.status === 'failed' ? 'text-bad' : 'text-ibm-soft')}>
@@ -95,24 +95,24 @@ export function DeploymentsPanel({ agg, onChanged, demo }: { agg: RunAggregate; 
                 </a>
               )}
               <dl className="mt-3.5 grid grid-cols-3 gap-2 text-xs border-t border-line/60 pt-2.5">
-                <div>
+                <div className="min-w-0">
                   <dt className="text-[10px] uppercase text-muted font-medium">Revision</dt>
                   <dd className="truncate font-mono text-fg mt-0.5">{d.revision ?? '—'}</dd>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <dt className="text-[10px] uppercase text-muted font-medium">Health</dt>
-                  <dd className={clsx('font-mono mt-0.5 font-medium', h?.ok ? 'text-ok' : 'text-bad')}>
+                  <dd className={clsx('font-mono mt-0.5 font-medium truncate', h?.ok ? 'text-ok' : 'text-bad')}>
                     {h ? (h.statusCode ? `HTTP ${h.statusCode}` : 'no response') : '—'}
                   </dd>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <dt className="text-[10px] uppercase text-muted font-medium">Latency</dt>
-                  <dd className="font-mono text-fg mt-0.5">{h ? `${h.latencyMs} ms` : '—'}</dd>
+                  <dd className="font-mono text-fg mt-0.5 truncate">{h ? `${h.latencyMs} ms` : '—'}</dd>
                 </div>
               </dl>
-              {h && <p className="mt-2 text-[10px] text-muted font-mono">probe: {fmtTime(h.checkedAt)}</p>}
-              {d.error && <p className="mt-2 text-xs text-bad font-mono">{d.error}</p>}
-              {d.note && <p className="mt-1 text-[10px] text-muted font-mono">last change: {d.note}</p>}
+              {h && <p className="mt-2 text-[10px] text-muted font-mono truncate">probe: {fmtTime(h.checkedAt)}</p>}
+              {d.error && <p className="mt-2 text-xs text-bad font-mono break-words">{d.error}</p>}
+              {d.note && <p className="mt-1 text-[10px] text-muted font-mono break-words">last change: {d.note}</p>}
 
               {/* 💥 Collapse button — only in demo + live mode */}
               {demo && MODE === 'live' && d.status === 'succeeded' && (
@@ -138,6 +138,14 @@ export function DeploymentsPanel({ agg, onChanged, demo }: { agg: RunAggregate; 
                     </>
                   )}
                 </button>
+              )}
+
+              {/* If demo mode is currently off, show how to enable */}
+              {!demo && MODE === 'live' && d.status === 'succeeded' && (
+                <div className="mt-3.5 flex items-center justify-between border-t border-line/40 pt-2 text-[10px] text-muted font-mono">
+                  <span>Demo Controls:</span>
+                  <span className="text-bad/80">Toggle &quot;💥 Demo Mode: ON&quot; in header</span>
+                </div>
               )}
             </div>
           );

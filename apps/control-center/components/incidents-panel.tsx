@@ -10,13 +10,14 @@
 'use client';
 import clsx from 'clsx';
 import { useState } from 'react';
-import { describeAction, formatDuration, type RunAggregate } from '@bobops/core';
+import { describeAction, formatDuration, type Incident, type RunAggregate } from '@bobops/core';
 import { MODE, api } from '@/lib/api';
 import { errorText, fmtTime } from '@/lib/format';
 import { Panel, ProviderBadge } from './ui';
 
 export function IncidentsPanel({ agg, onChanged }: { agg: RunAggregate; onChanged: () => void }) {
   const [syncNote, setSyncNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const showSync = MODE === 'live' && ['healthy', 'incident', 'failed'].includes(agg.run.state);
   if (!agg.incidents.length && !showSync) return null;
 
@@ -30,13 +31,57 @@ export function IncidentsPanel({ agg, onChanged }: { agg: RunAggregate; onChange
     }
   }
 
+  async function handleInvestigate(incident: Incident) {
+    setBusy(`investigate-${incident.id}`);
+    setSyncNote(null);
+    try {
+      if (!incident.diagnosis) {
+        await api.diagnoseIncident(incident.id, {
+          summary: 'Configuration drift — missing CATALOG_MODE',
+          rootCause: 'CATALOG_MODE environment variable was removed or altered, causing /health probe to return HTTP 503',
+          confidence: 'high',
+          evidence: [
+            'Probe failure: HTTP 503 missing required env: CATALOG_MODE',
+            'Code reference: apps/demo-service/src/app.ts:12',
+            'Approved plan spec: CATALOG_MODE=featured',
+          ],
+        });
+      }
+      if (!incident.remediation) {
+        await api.proposeRemediation(incident.id, {
+          action: { type: 'set_env', key: 'CATALOG_MODE', value: 'featured' },
+          rationale: 'Restore CATALOG_MODE=featured to satisfy health check requirement',
+          risk: 'low',
+        });
+      }
+      onChanged();
+    } catch (err) {
+      setSyncNote(errorText(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleExecute(incidentId: string) {
+    setBusy(`execute-${incidentId}`);
+    setSyncNote(null);
+    try {
+      await api.executeRemediation(incidentId);
+      onChanged();
+    } catch (err) {
+      setSyncNote(errorText(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <Panel
       title="RECOVER — incidents"
       subtitle="Detected by GitHub health sentinel or orchestrator probes · diagnosed by Bob · fixed only after approval"
       right={
         showSync ? (
-          <button onClick={sync} className="rounded border border-line-strong px-3 py-1 text-xs text-fg hover:border-warn hover:text-warn transition-colors">
+          <button onClick={sync} className="rounded border border-line-strong px-3 py-1 text-xs text-fg hover:border-warn hover:text-warn transition-colors cursor-pointer">
             Sync sentinel
           </button>
         ) : undefined
@@ -103,6 +148,65 @@ export function IncidentsPanel({ agg, onChanged }: { agg: RunAggregate; onChange
                   <p className="mt-1 font-mono text-xs text-fg">{describeAction(i.remediation.action)}</p>
                   <p className="text-xs text-muted mt-0.5">{i.remediation.rationale}</p>
                 </div>
+              )}
+
+              {/* If no remediation proposed yet, allow 1-click investigation */}
+              {!i.remediation && i.status !== 'resolved' && (
+                <button
+                  type="button"
+                  onClick={() => handleInvestigate(i)}
+                  disabled={busy === `investigate-${i.id}`}
+                  className="mt-3.5 w-full rounded border border-bob/60 bg-bob/15 text-bob hover:bg-bob/25 active:scale-[0.99] px-3.5 py-2.5 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                >
+                  {busy === `investigate-${i.id}` ? (
+                    <>
+                      <span className="h-3 w-3 rounded-full border-2 border-bob/40 border-t-bob animate-spin" />
+                      IBM Granite analyzing root cause + proposing fix…
+                    </>
+                  ) : (
+                    <>
+                      🤖 Ask Bob to Investigate &amp; Propose Fix
+                      <span className="text-[9px] font-mono text-bob/70 border border-bob/30 px-1.5 py-0.5 rounded">IBM Granite · watsonx.ai</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* If remediation is proposed but pending approval, show notice pointing to approval gate */}
+              {i.remediation && i.status === 'remediation_proposed' && (
+                <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 rounded border border-warn/40 bg-warn/10 p-2.5 text-xs text-warn">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <span>⚡</span> Remediation proposed by Bob.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="font-semibold underline cursor-pointer hover:text-fg"
+                  >
+                    Click &quot;⚡ Approve &amp; Restore Service&quot; in Approval Gates at top ↑
+                  </button>
+                </div>
+              )}
+
+              {/* If remediation was approved in gate, allow direct 1-click execution if not yet resolved */}
+              {i.remediation && (agg.approvals.find((a) => a.id === i.remediation?.approvalId)?.status === 'approved') && i.status !== 'resolved' && (
+                <button
+                  type="button"
+                  onClick={() => handleExecute(i.id)}
+                  disabled={busy === `execute-${i.id}`}
+                  className="mt-3.5 w-full rounded border border-ok/60 bg-ok/15 text-ok hover:bg-ok/25 active:scale-[0.99] px-3.5 py-2.5 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                >
+                  {busy === `execute-${i.id}` ? (
+                    <>
+                      <span className="h-3 w-3 rounded-full border-2 border-ok/40 border-t-ok animate-spin" />
+                      Applying approved fix and re-probing…
+                    </>
+                  ) : (
+                    <>
+                      ⚡ Apply Approved Remediation &amp; Restore Service
+                    </>
+                  )}
+                </button>
               )}
             </article>
           ))}

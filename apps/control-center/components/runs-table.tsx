@@ -47,7 +47,7 @@ export function RunsTable({ runs }: { runs: Run[] }) {
               </td>
               <td className="text-xs text-muted font-mono">{fmtTime(r.createdAt)}</td>
               <td className="text-right">
-                <Link href={`/run?id=${r.id}`} className="inline-flex items-center text-xs font-medium text-ibm-soft hover:text-ibm hover:underline">
+                <Link href={`/run?id=${r.id}&demo=1`} className="inline-flex items-center text-xs font-medium text-ibm-soft hover:text-ibm hover:underline">
                   Open →
                 </Link>
               </td>

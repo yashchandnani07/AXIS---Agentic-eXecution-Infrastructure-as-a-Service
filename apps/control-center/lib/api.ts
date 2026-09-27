@@ -7,7 +7,7 @@
  * @usedBy    every page/component that loads or mutates data
  * @agentNotes The approval token is sent ONLY from decide() and injectFault() — human actions in this UI.
  */
-import type { Approval, ProviderCapabilities, ProviderId, Run, RunAggregate, RunEvent } from '@bobops/core';
+import type { Approval, Diagnosis, HealthCheck, Incident, ProviderCapabilities, ProviderId, RemediationAction, Run, RunAggregate, RunEvent, Severity } from '@bobops/core';
 
 export const MODE: 'live' | 'replay' = process.env.NEXT_PUBLIC_MODE === 'replay' ? 'replay' : 'live';
 export const API = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? 'http://localhost:4000';
@@ -58,6 +58,12 @@ export const api = {
   verify: (runId: string) => http(`/api/runs/${runId}/verify`, post()),
   logs: (runId: string, provider: ProviderId) => http<{ lines: string[] }>(`/api/runs/${runId}/logs?provider=${provider}&lines=60`),
   syncIncidents: () => http<{ imported: number; open: number; note?: string }>('/api/incidents/sync', post()),
+  diagnoseIncident: (incidentId: string, diagnosis: Diagnosis) =>
+    http<Incident>(`/api/incidents/${incidentId}/diagnosis`, post(diagnosis)),
+  proposeRemediation: (incidentId: string, input: { action: RemediationAction; rationale: string; risk: Severity }) =>
+    http<{ incident: Incident; approval: Approval }>(`/api/incidents/${incidentId}/remediation`, post(input)),
+  executeRemediation: (incidentId: string) =>
+    http<{ ok: boolean; incident: Incident; checks: HealthCheck[]; error?: string }>(`/api/incidents/${incidentId}/execute`, post()),
   injectFault: (runId: string, provider: ProviderId) => http('/api/demo/fault', post({ runId, provider }, { 'x-approval-token': TOKEN })),
   /** Inject vulnerability + probe + AI narrative + Resend email in one shot. */
   collapse: (runId: string, provider: ProviderId) =>

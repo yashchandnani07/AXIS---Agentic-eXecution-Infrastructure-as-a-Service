@@ -33,6 +33,8 @@ body {
   background: var(--color-canvas);
   color: var(--color-fg);
   font-family: var(--font-sans);
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 ::selection {
