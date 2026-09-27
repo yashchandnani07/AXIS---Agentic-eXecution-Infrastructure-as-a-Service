@@ -11,6 +11,7 @@
  */
 import { describeService, servicesForProvider, type RunAggregate } from '@bobops/core';
 import { Panel, ProviderBadge, SeverityDot } from './ui';
+import { CostEstimator } from './cost-estimator';
 
 export function PlanPanel({ agg }: { agg: RunAggregate }) {
   const plan = agg.run.plan;
@@ -112,6 +113,7 @@ export function PlanPanel({ agg }: { agg: RunAggregate }) {
           )}
         </div>
       </div>
+      <CostEstimator plan={plan} />
     </Panel>
   );
 }
