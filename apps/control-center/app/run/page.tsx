@@ -8,12 +8,16 @@
  * @agentNotes Order = what needs a human first (approvals, incidents), then evidence. `demo=1` shows the fault control.
  */
 'use client';
+import clsx from 'clsx';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ApprovalQueue } from '@/components/approval-queue';
 import { AuditTrail } from '@/components/audit-trail';
+import { BrainFeed } from '@/components/brain-feed';
+import { CostTimeline } from '@/components/cost-timeline';
+import { DeploymentComparison } from '@/components/deployment-comparison';
 import { DeploymentsPanel } from '@/components/deployments-panel';
 import { IncidentsPanel } from '@/components/incidents-panel';
 import { LifecycleStepper } from '@/components/lifecycle-stepper';
@@ -32,11 +36,14 @@ export default function RunPage() {
   );
 }
 
+type RunTab = 'overview' | 'analytics' | 'brain';
+
 function RunView() {
   const params = useSearchParams();
   const id = params.get('id');
   const demo = params.get('demo') === '1';
   const { data, error, refresh } = useRun(id);
+  const [activeTab, setActiveTab] = useState<RunTab>('overview');
 
   if (!id) {
     return (
@@ -77,20 +84,77 @@ function RunView() {
       <LifecycleStepper agg={data} />
       <MetricsStrip agg={data} />
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
-          <ApprovalQueue agg={data} onDecided={refresh} />
-          <IncidentsPanel agg={data} onChanged={refresh} />
-          <DeploymentsPanel agg={data} onChanged={refresh} demo={demo} />
-          <PlanPanel agg={data} />
-          <AnalysisPanel agg={data} />
-          <LogsPanel agg={data} />
-        </div>
-        <div className="space-y-6">
-          <AuditTrail agg={data} />
-          <WatsonAgent runId={data.run.id} />
-        </div>
+      {/* Tab navigation */}
+      <div className="flex items-center gap-1.5 border-b border-line pb-1">
+        {([
+          { id: 'overview',  label: '🚀 Overview',         desc: 'Approvals, deployments, plan, logs' },
+          { id: 'analytics', label: '📊 Analytics',         desc: 'Cost timeline, uptime, comparison' },
+          { id: 'brain',     label: '🧠 Bob\'s Brain',      desc: 'Live labelled audit event feed' },
+        ] as { id: RunTab; label: string; desc: string }[]).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            title={tab.desc}
+            className={clsx(
+              'px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer',
+              activeTab === tab.id
+                ? 'bg-layer text-fg border border-line shadow-sm'
+                : 'text-muted hover:text-fg hover:bg-layer/50',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {/* TAB: Overview */}
+      {activeTab === 'overview' && (
+        <div className="grid gap-6 xl:grid-cols-3">
+          <div className="space-y-6 xl:col-span-2">
+            <ApprovalQueue agg={data} onDecided={refresh} />
+            <IncidentsPanel agg={data} onChanged={refresh} />
+            <DeploymentsPanel agg={data} onChanged={refresh} demo={demo} />
+            <PlanPanel agg={data} />
+            <AnalysisPanel agg={data} />
+            <LogsPanel agg={data} />
+          </div>
+          <div className="space-y-6">
+            <AuditTrail agg={data} />
+            <WatsonAgent runId={data.run.id} />
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Analytics */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          <CostTimeline agg={data} />
+          <DeploymentComparison agg={data} />
+          <div className="grid gap-6 xl:grid-cols-3">
+            <div className="xl:col-span-2 space-y-6">
+              <DeploymentsPanel agg={data} onChanged={refresh} demo={demo} />
+            </div>
+            <div>
+              <WatsonAgent runId={data.run.id} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Bob's Brain */}
+      {activeTab === 'brain' && (
+        <div className="space-y-6">
+          <BrainFeed agg={data} />
+          <div className="grid gap-6 xl:grid-cols-3">
+            <div className="xl:col-span-2">
+              <AuditTrail agg={data} />
+            </div>
+            <div>
+              <WatsonAgent runId={data.run.id} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
