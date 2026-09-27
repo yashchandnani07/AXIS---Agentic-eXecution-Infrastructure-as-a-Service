@@ -36,6 +36,19 @@ const post = (body: unknown = {}, headers: Record<string, string> = {}): Request
   headers,
 });
 
+export interface CollapseResult {
+  injected: boolean;
+  provider: ProviderId;
+  key: string;
+  revision?: string;
+  probe: { ok: boolean; statusCode: number; latencyMs: number; body: unknown } | null;
+  email: { sent: boolean; to: string[]; subject: string; skipped: boolean };
+  narrative: string;
+  rootCause: string;
+  remediationHint: string;
+  detectedAt: string;
+}
+
 export const api = {
   listRuns: () => (MODE === 'replay' ? replay<Run[]>('runs.json') : http<Run[]>('/api/runs')),
   getRun: (id: string) => (MODE === 'replay' ? replay<RunAggregate>(`${id}.json`) : http<RunAggregate>(`/api/runs/${id}`)),
@@ -46,6 +59,9 @@ export const api = {
   logs: (runId: string, provider: ProviderId) => http<{ lines: string[] }>(`/api/runs/${runId}/logs?provider=${provider}&lines=60`),
   syncIncidents: () => http<{ imported: number; open: number; note?: string }>('/api/incidents/sync', post()),
   injectFault: (runId: string, provider: ProviderId) => http('/api/demo/fault', post({ runId, provider }, { 'x-approval-token': TOKEN })),
+  /** Inject vulnerability + probe + AI narrative + Resend email in one shot. */
+  collapse: (runId: string, provider: ProviderId) =>
+    http<CollapseResult>('/api/demo/collapse', post({ runId, provider }, { 'x-approval-token': TOKEN })),
   exportEvidence: (runId: string) => http<{ json: string; markdown: string }>(`/api/runs/${runId}/export`, post()),
   askWatson: (question: string, runId?: string) =>
     http<{ question: string; answer: string; category: string; model: string; time: string; suggestedQuestions: string[] }>(

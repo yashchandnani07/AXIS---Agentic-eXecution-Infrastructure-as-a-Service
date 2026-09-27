@@ -29,6 +29,12 @@ const EnvSchema = z.object({
   GITHUB_TOKEN: optional,
   GITHUB_OWNER: optional,
   GITHUB_REPO: optional,
+  /** Resend API key for incident alert emails. Optional — email is skipped when absent. */
+  RESEND_API_KEY: optional,
+  /** Sender address, e.g. AXIS <alerts@yourdomain.com>. Defaults to onboarding@resend.dev (sandbox). */
+  RESEND_FROM: z.string().default('AXIS <onboarding@resend.dev>'),
+  /** Comma-separated recipient list for incident alert emails. */
+  RESEND_TO: z.string().default(''),
 });
 
 export type Config = z.infer<typeof EnvSchema> & {
