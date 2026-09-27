@@ -1,0 +1,854 @@
+{
+  "run": {
+    "id": "run_01f8d9e1bf",
+    "projectName": "nimbus-books",
+    "repoPath": "apps/demo-service",
+    "objective": "Deploy Nimbus Books to AWS Lambda with verified health",
+    "targets": [
+      "aws"
+    ],
+    "sentinelIntervalMinutes": 5,
+    "state": "healthy",
+    "createdAt": "2026-09-27T13:41:30.220Z",
+    "updatedAt": "2026-09-27T13:50:00.957Z",
+    "stateHistory": [
+      {
+        "state": "created",
+        "at": "2026-09-27T13:41:30.220Z"
+      },
+      {
+        "state": "analyzed",
+        "at": "2026-09-27T13:42:40.627Z"
+      },
+      {
+        "state": "awaiting_approval",
+        "at": "2026-09-27T13:43:31.904Z"
+      },
+      {
+        "state": "approved",
+        "at": "2026-09-27T13:48:34.785Z"
+      },
+      {
+        "state": "deploying",
+        "at": "2026-09-27T13:49:48.426Z"
+      },
+      {
+        "state": "verifying",
+        "at": "2026-09-27T13:49:58.186Z"
+      },
+      {
+        "state": "healthy",
+        "at": "2026-09-27T13:50:00.957Z"
+      }
+    ],
+    "profile": {
+      "name": "nimbus-books",
+      "runtime": "nodejs",
+      "runtimeVersion": "22",
+      "framework": "Hono",
+      "buildCommand": "pnpm --filter @bobops/demo-service build",
+      "startCommand": "node dist/server.mjs",
+      "port": 8080,
+      "healthPath": "/health",
+      "requiredEnv": [
+        "CATALOG_MODE",
+        "APP_VERSION"
+      ],
+      "secretEnv": [
+        "ADMIN_TOKEN"
+      ],
+      "dependencies": [
+        "hono",
+        "@hono/node-server",
+        "esbuild"
+      ],
+      "specialistFindings": [
+        {
+          "specialist": "application-analyst",
+          "summary": "Hono v4 service on Node 22, port 8080, health at /health, ESM build output. CATALOG_MODE required; ADMIN_TOKEN optional but secret.",
+          "findings": [
+            "Service name: @bobops/demo-service v1.0.0, framework Hono with @hono/node-server adapter",
+            "Port configurable via PORT env var, defaults to 8080",
+            "Health endpoint validates config and returns status (healthy/unhealthy)",
+            "CATALOG_MODE is a required env var; APP_VERSION and DEPLOY_PROVIDER are optional with defaults",
+            "ADMIN_TOKEN is optional but must be treated as a secret (header-based auth)",
+            "Entry point is src/server.ts; build output is ESM dist/server.mjs",
+            "Lambda entry point exists: src/lambda.ts with Hono AWS Lambda adapter"
+          ],
+          "confidence": "high",
+          "evidence": [
+            "apps/demo-service/package.json",
+            "apps/demo-service/src/server.ts"
+          ]
+        },
+        {
+          "specialist": "cloud-architect",
+          "summary": "Recommends lambda (scale-to-zero) for AWS due to sporadic demo traffic, lightweight in-memory operations, and existing lambda.ts adapter. Estimated $0.20/month.",
+          "findings": [
+            "Service already has src/lambda.ts with Hono AWS Lambda adapter — no adapter code needed",
+            "Four lightweight endpoints with sub-100ms latency; in-memory book catalog only",
+            "No database or external service dependencies — no connection warm-up penalty",
+            "Demo classification implies intermittent usage; scale-to-zero is cost-optimal",
+            "256MB memory profile sufficient for Node/Hono runtime",
+            "Expected ~100K requests/month fits AWS Lambda free tier (1M requests + 400K GB-seconds)"
+          ],
+          "confidence": "high",
+          "evidence": [
+            "apps/demo-service/src/lambda.ts",
+            "apps/demo-service/package.json"
+          ]
+        },
+        {
+          "specialist": "security-reviewer",
+          "summary": "High-severity: weak x-admin-token header auth and ADMIN_TOKEN not in secret manager. Medium: hardcoded test secret 'admin-secret' in test fixtures, missing security headers, no rate limiting on admin endpoint.",
+          "findings": [
+            "ADMIN_TOKEN must be stored in AWS Secrets Manager — never as plain env var",
+            "Admin endpoint uses custom x-admin-token header (weak); should use Authorization: Bearer",
+            "Test file contains hardcoded token 'admin-secret' — must not match production value",
+            "No CORS headers or security headers (X-Frame-Options, X-Content-Type-Options) configured",
+            "No rate limiting on /api/admin/stats — brute-force possible",
+            "Error responses may leak missing env var names — should return generic 500"
+          ],
+          "confidence": "high",
+          "evidence": [
+            "apps/demo-service/src/server.ts",
+            "apps/demo-service/src/app.test.ts"
+          ]
+        },
+        {
+          "specialist": "release-verifier",
+          "summary": "All deployment assets present (Dockerfile, .dockerignore, .ceignore, src/lambda.ts). Build and start scripts confirmed. Health endpoint present. No missing assets.",
+          "findings": [
+            "Build script: esbuild with Node 22 target, ESM output to dist/server.mjs",
+            "Start script: node dist/server.mjs — runs compiled server",
+            "Test script: vitest run — unit tests available",
+            "Health endpoint: GET /health returns status with config validation",
+            "All deployment assets present: Dockerfile, .dockerignore, .ceignore, src/lambda.ts",
+            "Dockerfile uses multi-stage Alpine build with non-root 'node' user"
+          ],
+          "confidence": "high",
+          "evidence": [
+            "apps/demo-service/Dockerfile",
+            "apps/demo-service/src/lambda.ts",
+            "apps/demo-service/package.json"
+          ]
+        }
+      ],
+      "risks": [
+        {
+          "id": "SEC-001",
+          "title": "Weak Admin Token Authentication",
+          "severity": "high",
+          "mitigation": "Use bearer token (Authorization: Bearer) instead of custom x-admin-token header; enforce HTTPS; add rate limiting."
+        },
+        {
+          "id": "SEC-002",
+          "title": "Missing Sensitive Secret Management",
+          "severity": "high",
+          "mitigation": "Store ADMIN_TOKEN in AWS Secrets Manager; never in plain env or source code; rotate regularly."
+        },
+        {
+          "id": "SEC-003",
+          "title": "Hardcoded Test Secrets in Source",
+          "severity": "medium",
+          "mitigation": "Extract test fixtures to separate file; scan with git-secrets or truffleHog before commits."
+        },
+        {
+          "id": "MISSING_ENV_VALIDATION",
+          "title": "Health endpoint returns 503 if required env vars missing",
+          "severity": "high",
+          "mitigation": "Deployment must set APP_VERSION and ADMIN_TOKEN before health checks pass; document in runbook."
+        }
+      ]
+    },
+    "plan": {
+      "summary": "Deploy Nimbus Books (Hono/Node 22, @bobops/demo-service) to AWS Lambda (scale-to-zero) in us-east-1. Service has pre-built lambda.ts adapter; all deployment assets are present. ADMIN_TOKEN delivered via secret ref.",
+      "targets": [
+        {
+          "provider": "aws",
+          "service": "lambda",
+          "region": "us-east-1",
+          "appName": "bobops-nimbus-books",
+          "port": 8080,
+          "resources": [
+            {
+              "type": "lambda-function",
+              "name": "bobops-nimbus-books",
+              "action": "create"
+            },
+            {
+              "type": "lambda-function-url",
+              "name": "bobops-nimbus-books-url",
+              "action": "create"
+            },
+            {
+              "type": "cloudwatch-log-group",
+              "name": "/aws/lambda/bobops-nimbus-books",
+              "action": "create"
+            }
+          ],
+          "env": {
+            "CATALOG_MODE": "featured",
+            "APP_VERSION": "1.0.0",
+            "DEPLOY_PROVIDER": "aws"
+          },
+          "secretRefs": [
+            "ADMIN_TOKEN"
+          ],
+          "healthPath": "/health",
+          "architectureRationale": "Nimbus Books is a lightweight Hono demo service with four in-memory endpoints and sub-100ms latency, exhibiting sporadic demo traffic patterns that make scale-to-zero Lambda ideal for cost efficiency; the service already ships a src/lambda.ts Hono AWS Lambda adapter requiring no additional cold-start mitigation."
+        }
+      ],
+      "risks": [
+        {
+          "id": "SEC-001",
+          "title": "Weak Admin Token Authentication",
+          "severity": "high",
+          "mitigation": "ADMIN_TOKEN delivered via AWS Secrets Manager secret ref; x-admin-token header auth is demo-grade — upgrade to Authorization: Bearer before production."
+        },
+        {
+          "id": "SEC-002",
+          "title": "ADMIN_TOKEN must be in Secrets Manager",
+          "severity": "high",
+          "mitigation": "Listed in secretRefs; must be created in AWS Secrets Manager as 'ADMIN_TOKEN' before deployment executes."
+        },
+        {
+          "id": "MISSING_ENV_VALIDATION",
+          "title": "Health returns 503 if required env vars missing",
+          "severity": "high",
+          "mitigation": "CATALOG_MODE, APP_VERSION, and ADMIN_TOKEN must all be set; plan env and secretRefs cover this requirement."
+        }
+      ],
+      "generatedAssets": [],
+      "rollbackStrategy": "Invoke devops_propose_remediation with type=rollback to revert to the previous Lambda revision via Lambda version alias swap.",
+      "approvalGates": [
+        "Human approval in Control Center before execution"
+      ],
+      "estimatedMonthlyCostUsd": 0.2
+    },
+    "planHash": "48354a7322dc7a30b1bb8cecd5ac12303b7c21d8ea771122cc1e775ec05640d4"
+  },
+  "approvals": [
+    {
+      "id": "apr_d4821f95d6",
+      "runId": "run_01f8d9e1bf",
+      "kind": "deploy_plan",
+      "subjectId": "run_01f8d9e1bf",
+      "subjectHash": "48354a7322dc7a30b1bb8cecd5ac12303b7c21d8ea771122cc1e775ec05640d4",
+      "summary": "Deploy Nimbus Books (Hono/Node 22, @bobops/demo-service) to AWS Lambda (scale-to-zero) in us-east-1. Service has pre-built lambda.ts adapter; all deployment assets are present. ADMIN_TOKEN delivered via secret ref.",
+      "risk": "high",
+      "status": "approved",
+      "requestedAt": "2026-09-27T13:43:31.903Z",
+      "decidedAt": "2026-09-27T13:48:34.790Z",
+      "decidedBy": "developer"
+    }
+  ],
+  "deployments": [
+    {
+      "id": "dep_7ff42abcf6",
+      "runId": "run_01f8d9e1bf",
+      "provider": "aws",
+      "service": "lambda",
+      "appName": "bobops-nimbus-books",
+      "region": "us-east-1",
+      "healthPath": "/health",
+      "status": "succeeded",
+      "startedAt": "2026-09-27T13:49:51.469Z",
+      "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+      "revision": "19",
+      "finishedAt": "2026-09-27T13:49:58.177Z"
+    }
+  ],
+  "healthChecks": [
+    {
+      "id": "4b46dc5d-52a5-4899-af71-9bed4568c475",
+      "provider": "aws",
+      "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+      "ok": true,
+      "statusCode": 200,
+      "latencyMs": 1965,
+      "revision": "1.0.0",
+      "body": {
+        "status": "healthy",
+        "service": "nimbus-books",
+        "revision": "1.0.0",
+        "provider": "aws",
+        "startedAt": "2026-09-27T13:49:58.856Z",
+        "checks": {
+          "config": {
+            "ok": true
+          }
+        }
+      },
+      "checkedAt": "2026-09-27T13:49:58.191Z",
+      "runId": "run_01f8d9e1bf"
+    }
+  ],
+  "incidents": [],
+  "events": [
+    {
+      "id": "evt_52d0cac02a",
+      "at": "2026-09-27T13:41:30.237Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "bob",
+      "kind": "action",
+      "type": "run.created",
+      "message": "Run created for nimbus-books (apps/demo-service): \"Deploy Nimbus Books to AWS Lambda with verified health\" → aws (sentinel check-in every 5 min)",
+      "evidence": []
+    },
+    {
+      "id": "evt_0b79114f0e",
+      "at": "2026-09-27T13:42:40.632Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "bob",
+      "kind": "observation",
+      "type": "analysis.recorded",
+      "message": "Bob profiled nimbus-books: nodejs 22 / Hono, port 8080, health /health, required env [CATALOG_MODE, APP_VERSION]",
+      "evidence": [
+        {
+          "label": "Application profile",
+          "source": "bob:synthesis",
+          "capturedAt": "2026-09-27T13:42:40.632Z",
+          "data": {
+            "name": "nimbus-books",
+            "runtime": "nodejs",
+            "runtimeVersion": "22",
+            "framework": "Hono",
+            "buildCommand": "pnpm --filter @bobops/demo-service build",
+            "startCommand": "node dist/server.mjs",
+            "port": 8080,
+            "healthPath": "/health",
+            "requiredEnv": [
+              "CATALOG_MODE",
+              "APP_VERSION"
+            ],
+            "secretEnv": [
+              "ADMIN_TOKEN"
+            ],
+            "dependencies": [
+              "hono",
+              "@hono/node-server",
+              "esbuild"
+            ],
+            "specialistFindings": [
+              {
+                "specialist": "application-analyst",
+                "summary": "Hono v4 service on Node 22, port 8080, health at /health, ESM build output. CATALOG_MODE required; ADMIN_TOKEN optional but secret.",
+                "findings": [
+                  "Service name: @bobops/demo-service v1.0.0, framework Hono with @hono/node-server adapter",
+                  "Port configurable via PORT env var, defaults to 8080",
+                  "Health endpoint validates config and returns status (healthy/unhealthy)",
+                  "CATALOG_MODE is a required env var; APP_VERSION and DEPLOY_PROVIDER are optional with defaults",
+                  "ADMIN_TOKEN is optional but must be treated as a secret (header-based auth)",
+                  "Entry point is src/server.ts; build output is ESM dist/server.mjs",
+                  "Lambda entry point exists: src/lambda.ts with Hono AWS Lambda adapter"
+                ],
+                "confidence": "high",
+                "evidence": [
+                  "apps/demo-service/package.json",
+                  "apps/demo-service/src/server.ts"
+                ]
+              },
+              {
+                "specialist": "cloud-architect",
+                "summary": "Recommends lambda (scale-to-zero) for AWS due to sporadic demo traffic, lightweight in-memory operations, and existing lambda.ts adapter. Estimated $0.20/month.",
+                "findings": [
+                  "Service already has src/lambda.ts with Hono AWS Lambda adapter — no adapter code needed",
+                  "Four lightweight endpoints with sub-100ms latency; in-memory book catalog only",
+                  "No database or external service dependencies — no connection warm-up penalty",
+                  "Demo classification implies intermittent usage; scale-to-zero is cost-optimal",
+                  "256MB memory profile sufficient for Node/Hono runtime",
+                  "Expected ~100K requests/month fits AWS Lambda free tier (1M requests + 400K GB-seconds)"
+                ],
+                "confidence": "high",
+                "evidence": [
+                  "apps/demo-service/src/lambda.ts",
+                  "apps/demo-service/package.json"
+                ]
+              },
+              {
+                "specialist": "security-reviewer",
+                "summary": "High-severity: weak x-admin-token header auth and ADMIN_TOKEN not in secret manager. Medium: hardcoded test secret 'admin-secret' in test fixtures, missing security headers, no rate limiting on admin endpoint.",
+                "findings": [
+                  "ADMIN_TOKEN must be stored in AWS Secrets Manager — never as plain env var",
+                  "Admin endpoint uses custom x-admin-token header (weak); should use Authorization: Bearer",
+                  "Test file contains hardcoded token 'admin-secret' — must not match production value",
+                  "No CORS headers or security headers (X-Frame-Options, X-Content-Type-Options) configured",
+                  "No rate limiting on /api/admin/stats — brute-force possible",
+                  "Error responses may leak missing env var names — should return generic 500"
+                ],
+                "confidence": "high",
+                "evidence": [
+                  "apps/demo-service/src/server.ts",
+                  "apps/demo-service/src/app.test.ts"
+                ]
+              },
+              {
+                "specialist": "release-verifier",
+                "summary": "All deployment assets present (Dockerfile, .dockerignore, .ceignore, src/lambda.ts). Build and start scripts confirmed. Health endpoint present. No missing assets.",
+                "findings": [
+                  "Build script: esbuild with Node 22 target, ESM output to dist/server.mjs",
+                  "Start script: node dist/server.mjs — runs compiled server",
+                  "Test script: vitest run — unit tests available",
+                  "Health endpoint: GET /health returns status with config validation",
+                  "All deployment assets present: Dockerfile, .dockerignore, .ceignore, src/lambda.ts",
+                  "Dockerfile uses multi-stage Alpine build with non-root 'node' user"
+                ],
+                "confidence": "high",
+                "evidence": [
+                  "apps/demo-service/Dockerfile",
+                  "apps/demo-service/src/lambda.ts",
+                  "apps/demo-service/package.json"
+                ]
+              }
+            ],
+            "risks": [
+              {
+                "id": "SEC-001",
+                "title": "Weak Admin Token Authentication",
+                "severity": "high",
+                "mitigation": "Use bearer token (Authorization: Bearer) instead of custom x-admin-token header; enforce HTTPS; add rate limiting."
+              },
+              {
+                "id": "SEC-002",
+                "title": "Missing Sensitive Secret Management",
+                "severity": "high",
+                "mitigation": "Store ADMIN_TOKEN in AWS Secrets Manager; never in plain env or source code; rotate regularly."
+              },
+              {
+                "id": "SEC-003",
+                "title": "Hardcoded Test Secrets in Source",
+                "severity": "medium",
+                "mitigation": "Extract test fixtures to separate file; scan with git-secrets or truffleHog before commits."
+              },
+              {
+                "id": "MISSING_ENV_VALIDATION",
+                "title": "Health endpoint returns 503 if required env vars missing",
+                "severity": "high",
+                "mitigation": "Deployment must set APP_VERSION and ADMIN_TOKEN before health checks pass; document in runbook."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_9f8dacabcc",
+      "at": "2026-09-27T13:42:40.637Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "specialist.finding",
+      "message": "application-analyst: Hono v4 service on Node 22, port 8080, health at /health, ESM build output. CATALOG_MODE required; ADMIN_TOKEN optional but secret.",
+      "evidence": [
+        {
+          "label": "application-analyst findings",
+          "source": "bob:application-analyst",
+          "capturedAt": "2026-09-27T13:42:40.637Z",
+          "data": {
+            "specialist": "application-analyst",
+            "summary": "Hono v4 service on Node 22, port 8080, health at /health, ESM build output. CATALOG_MODE required; ADMIN_TOKEN optional but secret.",
+            "findings": [
+              "Service name: @bobops/demo-service v1.0.0, framework Hono with @hono/node-server adapter",
+              "Port configurable via PORT env var, defaults to 8080",
+              "Health endpoint validates config and returns status (healthy/unhealthy)",
+              "CATALOG_MODE is a required env var; APP_VERSION and DEPLOY_PROVIDER are optional with defaults",
+              "ADMIN_TOKEN is optional but must be treated as a secret (header-based auth)",
+              "Entry point is src/server.ts; build output is ESM dist/server.mjs",
+              "Lambda entry point exists: src/lambda.ts with Hono AWS Lambda adapter"
+            ],
+            "confidence": "high",
+            "evidence": [
+              "apps/demo-service/package.json",
+              "apps/demo-service/src/server.ts"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_bcd65f22fa",
+      "at": "2026-09-27T13:42:40.646Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "specialist.finding",
+      "message": "cloud-architect: Recommends lambda (scale-to-zero) for AWS due to sporadic demo traffic, lightweight in-memory operations, and existing lambda.ts adapter. Estimated $0.20/month.",
+      "evidence": [
+        {
+          "label": "cloud-architect findings",
+          "source": "bob:cloud-architect",
+          "capturedAt": "2026-09-27T13:42:40.646Z",
+          "data": {
+            "specialist": "cloud-architect",
+            "summary": "Recommends lambda (scale-to-zero) for AWS due to sporadic demo traffic, lightweight in-memory operations, and existing lambda.ts adapter. Estimated $0.20/month.",
+            "findings": [
+              "Service already has src/lambda.ts with Hono AWS Lambda adapter — no adapter code needed",
+              "Four lightweight endpoints with sub-100ms latency; in-memory book catalog only",
+              "No database or external service dependencies — no connection warm-up penalty",
+              "Demo classification implies intermittent usage; scale-to-zero is cost-optimal",
+              "256MB memory profile sufficient for Node/Hono runtime",
+              "Expected ~100K requests/month fits AWS Lambda free tier (1M requests + 400K GB-seconds)"
+            ],
+            "confidence": "high",
+            "evidence": [
+              "apps/demo-service/src/lambda.ts",
+              "apps/demo-service/package.json"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_ba70abeaac",
+      "at": "2026-09-27T13:42:40.653Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "specialist.finding",
+      "message": "security-reviewer: High-severity: weak x-admin-token header auth and ADMIN_TOKEN not in secret manager. Medium: hardcoded test secret 'admin-secret' in test fixtures, missing security headers, no rate limiting on admin endpoint.",
+      "evidence": [
+        {
+          "label": "security-reviewer findings",
+          "source": "bob:security-reviewer",
+          "capturedAt": "2026-09-27T13:42:40.653Z",
+          "data": {
+            "specialist": "security-reviewer",
+            "summary": "High-severity: weak x-admin-token header auth and ADMIN_TOKEN not in secret manager. Medium: hardcoded test secret 'admin-secret' in test fixtures, missing security headers, no rate limiting on admin endpoint.",
+            "findings": [
+              "ADMIN_TOKEN must be stored in AWS Secrets Manager — never as plain env var",
+              "Admin endpoint uses custom x-admin-token header (weak); should use Authorization: Bearer",
+              "Test file contains hardcoded token 'admin-secret' — must not match production value",
+              "No CORS headers or security headers (X-Frame-Options, X-Content-Type-Options) configured",
+              "No rate limiting on /api/admin/stats — brute-force possible",
+              "Error responses may leak missing env var names — should return generic 500"
+            ],
+            "confidence": "high",
+            "evidence": [
+              "apps/demo-service/src/server.ts",
+              "apps/demo-service/src/app.test.ts"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_8e12ae22ea",
+      "at": "2026-09-27T13:42:40.660Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "bob",
+      "kind": "inference",
+      "type": "specialist.finding",
+      "message": "release-verifier: All deployment assets present (Dockerfile, .dockerignore, .ceignore, src/lambda.ts). Build and start scripts confirmed. Health endpoint present. No missing assets.",
+      "evidence": [
+        {
+          "label": "release-verifier findings",
+          "source": "bob:release-verifier",
+          "capturedAt": "2026-09-27T13:42:40.660Z",
+          "data": {
+            "specialist": "release-verifier",
+            "summary": "All deployment assets present (Dockerfile, .dockerignore, .ceignore, src/lambda.ts). Build and start scripts confirmed. Health endpoint present. No missing assets.",
+            "findings": [
+              "Build script: esbuild with Node 22 target, ESM output to dist/server.mjs",
+              "Start script: node dist/server.mjs — runs compiled server",
+              "Test script: vitest run — unit tests available",
+              "Health endpoint: GET /health returns status with config validation",
+              "All deployment assets present: Dockerfile, .dockerignore, .ceignore, src/lambda.ts",
+              "Dockerfile uses multi-stage Alpine build with non-root 'node' user"
+            ],
+            "confidence": "high",
+            "evidence": [
+              "apps/demo-service/Dockerfile",
+              "apps/demo-service/src/lambda.ts",
+              "apps/demo-service/package.json"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_d5a6f871c2",
+      "at": "2026-09-27T13:43:31.917Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "bob",
+      "kind": "proposal",
+      "type": "plan.submitted",
+      "message": "Bob proposed a plan for aws/lambda (3 risks, 0 generated assets)",
+      "evidence": [
+        {
+          "label": "Deployment plan",
+          "source": "bob:synthesis",
+          "capturedAt": "2026-09-27T13:43:31.917Z",
+          "data": {
+            "summary": "Deploy Nimbus Books (Hono/Node 22, @bobops/demo-service) to AWS Lambda (scale-to-zero) in us-east-1. Service has pre-built lambda.ts adapter; all deployment assets are present. ADMIN_TOKEN delivered via secret ref.",
+            "targets": [
+              {
+                "provider": "aws",
+                "service": "lambda",
+                "region": "us-east-1",
+                "appName": "bobops-nimbus-books",
+                "port": 8080,
+                "resources": [
+                  {
+                    "type": "lambda-function",
+                    "name": "bobops-nimbus-books",
+                    "action": "create"
+                  },
+                  {
+                    "type": "lambda-function-url",
+                    "name": "bobops-nimbus-books-url",
+                    "action": "create"
+                  },
+                  {
+                    "type": "cloudwatch-log-group",
+                    "name": "/aws/lambda/bobops-nimbus-books",
+                    "action": "create"
+                  }
+                ],
+                "env": {
+                  "CATALOG_MODE": "featured",
+                  "APP_VERSION": "1.0.0",
+                  "DEPLOY_PROVIDER": "aws"
+                },
+                "secretRefs": [
+                  "ADMIN_TOKEN"
+                ],
+                "healthPath": "/health",
+                "architectureRationale": "Nimbus Books is a lightweight Hono demo service with four in-memory endpoints and sub-100ms latency, exhibiting sporadic demo traffic patterns that make scale-to-zero Lambda ideal for cost efficiency; the service already ships a src/lambda.ts Hono AWS Lambda adapter requiring no additional cold-start mitigation."
+              }
+            ],
+            "risks": [
+              {
+                "id": "SEC-001",
+                "title": "Weak Admin Token Authentication",
+                "severity": "high",
+                "mitigation": "ADMIN_TOKEN delivered via AWS Secrets Manager secret ref; x-admin-token header auth is demo-grade — upgrade to Authorization: Bearer before production."
+              },
+              {
+                "id": "SEC-002",
+                "title": "ADMIN_TOKEN must be in Secrets Manager",
+                "severity": "high",
+                "mitigation": "Listed in secretRefs; must be created in AWS Secrets Manager as 'ADMIN_TOKEN' before deployment executes."
+              },
+              {
+                "id": "MISSING_ENV_VALIDATION",
+                "title": "Health returns 503 if required env vars missing",
+                "severity": "high",
+                "mitigation": "CATALOG_MODE, APP_VERSION, and ADMIN_TOKEN must all be set; plan env and secretRefs cover this requirement."
+              }
+            ],
+            "generatedAssets": [],
+            "rollbackStrategy": "Invoke devops_propose_remediation with type=rollback to revert to the previous Lambda revision via Lambda version alias swap.",
+            "approvalGates": [
+              "Human approval in Control Center before execution"
+            ],
+            "estimatedMonthlyCostUsd": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_6fbf173ee2",
+      "at": "2026-09-27T13:43:31.922Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "orchestrator",
+      "kind": "proposal",
+      "type": "approval.requested",
+      "message": "Human approval required for the deployment plan (hash 48354a7322dc…, risk high)",
+      "evidence": []
+    },
+    {
+      "id": "evt_dc25f61568",
+      "at": "2026-09-27T13:48:34.796Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "human",
+      "kind": "action",
+      "type": "approval.decided",
+      "message": "developer approved the deployment plan",
+      "evidence": []
+    },
+    {
+      "id": "evt_b8b58a554e",
+      "at": "2026-09-27T13:49:48.430Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "orchestrator",
+      "kind": "action",
+      "type": "test.started",
+      "message": "Running the pre-deploy test suite in apps/demo-service",
+      "evidence": []
+    },
+    {
+      "id": "evt_c48d77cfbb",
+      "at": "2026-09-27T13:49:51.465Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "orchestrator",
+      "kind": "verification",
+      "type": "test.passed",
+      "message": "Pre-deploy tests passed",
+      "evidence": [
+        {
+          "label": "Test output (tail)",
+          "source": "vitest",
+          "capturedAt": "2026-09-27T13:49:51.465Z",
+          "data": "\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90mC:/Users/Yash/Desktop/work/IBM-Bob/apps/demo-service\u001b[39m\n\u001b[90mstderr\u001b[2m | src/app.test.ts\u001b[2m > \u001b[22m\u001b[2mnimbus-books\u001b[2m > \u001b[22m\u001b[2mGET /health → 503 naming the missing variable when CATALOG_MODE is absent\n\u001b[22m\u001b[39m[health] FAIL missing required env: CATALOG_MODE\n\u001b[90mstderr\u001b[2m | src/app.test.ts\u001b[2m > \u001b[22m\u001b[2mnimbus-books\u001b[2m > \u001b[22m\u001b[2mGET /api/books → 500 when configuration is missing\n\u001b[22m\u001b[39m[books] cannot serve catalog: missing CATALOG_MODE\n \u001b[32m✓\u001b[39m src/app.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 23\u001b[2mms\u001b[22m\u001b[39m\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m6 passed\u001b[39m\u001b[22m\u001b[90m (6)\u001b[39m\n\u001b[2m   Start at \u001b[22m 19:19:50\n\u001b[2m   Duration \u001b[22m 821ms\u001b[2m (transform 88ms, setup 0ms, collect 121ms, tests 23ms, environment 0ms, prepare 275ms)\u001b[22m"
+        }
+      ]
+    },
+    {
+      "id": "evt_6d7a5e14c1",
+      "at": "2026-09-27T13:49:51.473Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "deploy.started",
+      "message": "Deploying bobops-nimbus-books to aws (lambda, us-east-1)",
+      "evidence": []
+    },
+    {
+      "id": "evt_abdb1b764a",
+      "at": "2026-09-27T13:49:51.476Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "build.started",
+      "message": "Bundling demo-service/src/lambda.ts with esbuild (ESM, node22)",
+      "evidence": []
+    },
+    {
+      "id": "evt_f074d1153b",
+      "at": "2026-09-27T13:49:51.536Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "build.completed",
+      "message": "Lambda bundle ready (9.9 KiB zipped)",
+      "evidence": []
+    },
+    {
+      "id": "evt_149be9b4ac",
+      "at": "2026-09-27T13:49:51.917Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "provision.started",
+      "message": "Updating existing Lambda function bobops-nimbus-books in us-east-1",
+      "evidence": []
+    },
+    {
+      "id": "evt_143c5b8552",
+      "at": "2026-09-27T13:49:58.169Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "provision.completed",
+      "message": "Alias live → version 19 (lambda)",
+      "evidence": []
+    },
+    {
+      "id": "evt_c00240a813",
+      "at": "2026-09-27T13:49:58.181Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "provider:aws",
+      "kind": "action",
+      "type": "deploy.completed",
+      "message": "aws is serving bobops-nimbus-books at https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/ (revision 19)",
+      "evidence": [
+        {
+          "label": "Lambda deployment",
+          "source": "AWS Lambda API",
+          "capturedAt": "2026-09-27T13:49:58.177Z",
+          "data": {
+            "functionName": "bobops-nimbus-books",
+            "version": "19",
+            "alias": "live",
+            "service": "lambda",
+            "url": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+            "runtime": "nodejs22.x",
+            "region": "us-east-1",
+            "bundleBytes": 10153
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_c3e8cf187c",
+      "at": "2026-09-27T13:50:00.952Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "orchestrator",
+      "kind": "verification",
+      "type": "verify.passed",
+      "message": "aws healthy — HTTP 200 in 1965 ms (revision 1.0.0)",
+      "evidence": [
+        {
+          "label": "HTTP health probe",
+          "source": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+          "capturedAt": "2026-09-27T13:50:00.952Z",
+          "data": {
+            "id": "4b46dc5d-52a5-4899-af71-9bed4568c475",
+            "provider": "aws",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/health",
+            "ok": true,
+            "statusCode": 200,
+            "latencyMs": 1965,
+            "revision": "1.0.0",
+            "body": {
+              "status": "healthy",
+              "service": "nimbus-books",
+              "revision": "1.0.0",
+              "provider": "aws",
+              "startedAt": "2026-09-27T13:49:58.856Z",
+              "checks": {
+                "config": {
+                  "ok": true
+                }
+              }
+            },
+            "checkedAt": "2026-09-27T13:49:58.191Z"
+          }
+        },
+        {
+          "label": "Provider-native status",
+          "source": "aws API",
+          "capturedAt": "2026-09-27T13:50:00.952Z",
+          "data": {
+            "state": "ready",
+            "revision": "19",
+            "endpoint": "https://wubwqne4w23xawmxzjkpywz25a0mtktx.lambda-url.us-east-1.on.aws/",
+            "env": {
+              "DEPLOY_PROVIDER": "aws",
+              "ADMIN_TOKEN": "••••redacted",
+              "CATALOG_MODE": "featured",
+              "APP_VERSION": "1.0.0"
+            },
+            "raw": {
+              "runtime": "nodejs22.x",
+              "state": "Active",
+              "lastUpdateStatus": "Successful",
+              "lastModified": "2026-09-27T13:49:54.000+0000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "evt_afd4b4143d",
+      "at": "2026-09-27T13:50:01.664Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "orchestrator",
+      "kind": "observation",
+      "type": "orchestrator.warning",
+      "message": "Could not arm the GitHub sentinel: Not Found - https://docs.github.com/rest/actions/variables#create-a-repository-variable",
+      "evidence": []
+    },
+    {
+      "id": "evt_0a3ec0a03a",
+      "at": "2026-09-27T13:50:12.270Z",
+      "runId": "run_01f8d9e1bf",
+      "actor": "orchestrator",
+      "kind": "action",
+      "type": "evidence.exported",
+      "message": "Audit trail exported to evidence/demo-runs/run_01f8d9e1bf.md and evidence/demo-runs/run_01f8d9e1bf.json",
+      "evidence": []
+    }
+  ]
+}

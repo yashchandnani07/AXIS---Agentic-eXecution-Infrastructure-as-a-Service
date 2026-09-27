@@ -5,7 +5,7 @@ description: >-
   workflow
 metadata:
   user-invocable: true
-  disable-model-invocation: true
+  disable-model-invocation: false
   argument-hint: '<repoPath, default apps/demo-service> [objective]'
 ---
 

@@ -3,7 +3,7 @@
     "bobops-orchestrator": {
       "command": "node",
       "args": [
-        "C:/Users/hp/.gemini/antigravity/scratch/AXIS---Agentic-eXecution-Infrastructure-as-a-Service/apps/bob-mcp/dist/bob-mcp.mjs"
+        "C:/Users/Yash/Desktop/work/IBM-Bob/apps/bob-mcp/dist/bob-mcp.mjs"
       ],
       "env": {
         "ORCHESTRATOR_URL": "http://localhost:4000",
